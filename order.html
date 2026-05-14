@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>barvaediva</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Noto+Sans+JP:wght@300;400&display=swap" rel="stylesheet">
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0e0b09;--surface:#181410;--border:#2e2820;
+  --gold:#c9a96e;--gold-dim:#8a6e45;--text:#f0ead8;--muted:#7a6f5e;
+  --font-display:'Cormorant Garamond',serif;--font-body:'Noto Sans JP',sans-serif;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-weight:300;min-height:100vh;padding-bottom:140px}
+#setup-banner{background:#1a1008;border-bottom:1px solid #5a3a10;padding:12px 20px;font-size:12px;color:#d4a24c;line-height:1.8;text-align:center}
+#setup-banner strong{color:#f0c060;font-weight:400}
+#setup-banner.hidden{display:none}
+header{position:relative;text-align:center;padding:48px 24px 32px;border-bottom:1px solid var(--border)}
+header::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%, rgba(201,169,110,0.08) 0%, transparent 70%);pointer-events:none}
+.logo{font-family:var(--font-display);font-size:clamp(32px,8vw,48px);font-weight:300;letter-spacing:0.12em;color:var(--gold)}
+.logo-sub{font-size:11px;letter-spacing:0.25em;color:var(--muted);margin-top:6px;text-transform:uppercase}
+.table-badge{display:inline-block;margin-top:16px;padding:5px 18px;border:1px solid var(--border);border-radius:2px;font-size:12px;letter-spacing:0.15em;color:var(--gold-dim)}
+#menu-list{padding:24px 16px;max-width:480px;margin:0 auto}
+.menu-item{display:flex;align-items:center;justify-content:space-between;padding:20px 0;border-bottom:1px solid var(--border);animation:fadeup 0.4s ease both}
+@keyframes fadeup{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.menu-item:nth-child(1){animation-delay:.05s}.menu-item:nth-child(2){animation-delay:.1s}.menu-item:nth-child(3){animation-delay:.15s}.menu-item:nth-child(4){animation-delay:.2s}.menu-item:nth-child(5){animation-delay:.25s}
+.item-cat{font-size:10px;letter-spacing:0.15em;color:var(--muted);text-transform:uppercase}
+.item-name{font-family:var(--font-display);font-size:22px;font-weight:300;color:var(--text);margin:4px 0 2px;letter-spacing:0.04em}
+.item-price{font-size:13px;color:var(--gold-dim);letter-spacing:0.05em}
+.qty-ctrl{display:flex;align-items:center;gap:14px;flex-shrink:0}
+.qty-btn{width:34px;height:34px;border-radius:50%;border:1px solid var(--border);background:transparent;color:var(--gold);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s,border-color .2s}
+.qty-btn:hover:not(:disabled){background:var(--surface);border-color:var(--gold-dim)}
+.qty-btn:disabled{opacity:.25;cursor:default}
+.qty-num{font-size:18px;font-family:var(--font-display);min-width:20px;text-align:center;color:var(--text)}
+#cart-bar{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);padding:16px 20px 28px;max-width:480px;margin:0 auto;transition:opacity .3s}
+.cart-summary{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+.cart-count-label{font-size:11px;color:var(--muted);letter-spacing:0.1em}
+#cart-count{font-family:var(--font-display);font-size:24px;color:var(--gold);margin:0 4px}
+#cart-items{display:block;font-size:11px;color:var(--muted);margin-top:4px;line-height:1.6;max-width:240px}
+#cart-total{font-family:var(--font-display);font-size:28px;color:var(--text);font-weight:300}
+#order-btn{width:100%;padding:14px;background:var(--gold);color:#0e0b09;border:none;font-family:var(--font-body);font-size:14px;letter-spacing:0.15em;cursor:pointer;border-radius:2px;transition:opacity .2s,transform .1s;font-weight:400}
+#order-btn:hover:not(:disabled){opacity:.9}
+#order-btn:active:not(:disabled){transform:scale(.98)}
+#order-btn:disabled{opacity:.35;cursor:default}
+#confirm-overlay{display:none;position:fixed;inset:0;background:rgba(14,11,9,.85);align-items:center;justify-content:center;opacity:0;transition:opacity .4s;z-index:100}
+.confirm-box{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:40px 32px;text-align:center;max-width:320px;width:90%}
+.confirm-icon{width:52px;height:52px;border-radius:50%;border:1px solid var(--gold-dim);display:flex;align-items:center;justify-content:center;margin:0 auto 20px}
+.confirm-icon svg{width:24px;height:24px;stroke:var(--gold);fill:none;stroke-width:1.5}
+.confirm-title{font-family:var(--font-display);font-size:26px;font-weight:300;color:var(--gold);margin-bottom:8px}
+.confirm-sub{font-size:13px;color:var(--muted);line-height:1.7}
+#close-confirm{margin-top:28px;padding:10px 32px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:12px;letter-spacing:0.12em;cursor:pointer;border-radius:2px;font-family:var(--font-body);transition:border-color .2s,color .2s}
+#close-confirm:hover{border-color:var(--gold-dim);color:var(--text)}
+</style>
+</head>
+<body>
+
+<div id="setup-banner">
+  ⚠ <strong>Firebase未設定：</strong>このファイルをメモ帳やVSCodeで開き、
+  「<strong>★ここにFirebaseの設定を貼り付け★</strong>」と書かれた箇所を
+  Firebaseコンソールのコードに書き換えてください。
+  書き換え後はこのバナーが自動で消えます。
+</div>
+
+<header>
+  <p class="logo">barvaediva</p>
+  <p class="logo-sub">Drink Menu</p>
+  <p class="table-badge" id="table-label">Table —</p>
+</header>
+
+<div id="menu-list"></div>
+
+<div id="cart-bar">
+  <div class="cart-summary">
+    <div>
+      <span class="cart-count-label">選択中</span>
+      <span id="cart-count">0</span>
+      <span class="cart-count-label">点</span>
+      <span id="cart-items" style="display:block;font-size:11px;color:var(--muted);margin-top:4px;line-height:1.6;max-width:240px"></span>
+    </div>
+    <span id="cart-total">¥0</span>
+  </div>
+  <button id="order-btn" disabled>注文を確定する</button>
+</div>
+
+<div id="confirm-overlay">
+  <div class="confirm-box">
+    <div class="confirm-icon"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
+    <p class="confirm-title">ご注文ありがとうございます</p>
+    <p class="confirm-sub">スタッフがご準備いたします。<br>しばらくお待ちください。</p>
+    <button id="close-confirm">閉じる</button>
+  </div>
+</div>
+
+<!-- ▼▼▼ メニュー表示とカート（Firebaseなしでも動きます） ▼▼▼ -->
+<script>
+var menu = [
+  { id:1, name:"ハートランド",  price:770,  category:"ビール" },
+  { id:2, name:"赤ワイン",      price:880,  category:"ワイン" },
+  { id:3, name:"白ワイン",      price:880,  category:"ワイン" },
+  { id:4, name:"陸ハイボール",  price:770,  category:"ウイスキー" },
+  { id:5, name:"自家製コーラ",  price:770,  category:"ソフトドリンク" }
+];
+
+var tableNum = new URLSearchParams(location.search).get("table") || "?";
+document.getElementById("table-label").textContent = "Table " + tableNum;
+
+var cart = {};
+
+function renderMenu() {
+  var c = document.getElementById("menu-list");
+  c.innerHTML = "";
+  menu.forEach(function(item) {
+    var qty = cart[item.id] || 0;
+    var d = document.createElement("div");
+    d.className = "menu-item";
+    d.innerHTML =
+      '<div><span class="item-cat">'+item.category+'</span>' +
+      '<p class="item-name">'+item.name+'</p>' +
+      '<p class="item-price">¥'+item.price.toLocaleString()+'</p></div>' +
+      '<div class="qty-ctrl">' +
+        '<button class="qty-btn minus" data-id="'+item.id+'"'+(qty===0?' disabled':'')+'>−</button>' +
+        '<span class="qty-num">'+qty+'</span>' +
+        '<button class="qty-btn plus" data-id="'+item.id+'">+</button>' +
+      '</div>';
+    c.appendChild(d);
+  });
+  renderCart();
+}
+
+function renderCart() {
+  var total=0, count=0, lines=[];
+  menu.forEach(function(item) {
+    var q = cart[item.id]||0;
+    if(q>0){ lines.push(item.name+" ×"+q); total+=item.price*q; count+=q; }
+  });
+  document.getElementById("cart-count").textContent = count;
+  document.getElementById("cart-total").textContent = "¥"+total.toLocaleString();
+  document.getElementById("cart-items").textContent = lines.join(" / ");
+  document.getElementById("order-btn").disabled = count===0;
+  document.getElementById("cart-bar").style.opacity = count>0?"1":"0.4";
+}
+
+document.addEventListener("click", function(e) {
+  var btn = e.target.closest(".qty-btn");
+  if(!btn) return;
+  var id = parseInt(btn.dataset.id);
+  if(btn.classList.contains("plus")){ cart[id]=(cart[id]||0)+1; }
+  else{ if(cart[id]>0) cart[id]--; }
+  renderMenu();
+});
+
+document.getElementById("order-btn").addEventListener("click", function() {
+  var items = menu.filter(function(i){ return (cart[i.id]||0)>0; })
+    .map(function(i){ return {name:i.name,price:i.price,qty:cart[i.id]}; });
+  var total = items.reduce(function(s,i){ return s+i.price*i.qty; },0);
+  submitOrder(tableNum, items, total);
+});
+
+document.getElementById("close-confirm").addEventListener("click", function() {
+  var ov = document.getElementById("confirm-overlay");
+  ov.style.opacity="0";
+  setTimeout(function(){ ov.style.display="none"; },400);
+  document.getElementById("order-btn").textContent="注文を確定する";
+});
+
+function showConfirm() {
+  cart={};
+  renderMenu();
+  var ov = document.getElementById("confirm-overlay");
+  ov.style.display="flex";
+  setTimeout(function(){ ov.style.opacity="1"; },10);
+}
+
+// Firebaseが未設定の場合のフォールバック
+function submitOrder(table, items, total) {
+  alert("Firebase未設定のため送信できません。\nセットアップ手順.md を見て設定してください。");
+}
+
+renderMenu();
+</script>
+
+<!-- ▼▼▼ ★★★ ここにFirebaseの設定を貼り付け ★★★ ▼▼▼
+
+  【手順】
+  1. https://console.firebase.google.com を開く
+  2. プロジェクトを選択（まだなければ作成）
+  3. 左上の歯車アイコン →「プロジェクトの設定」
+  4. 下にスクロール →「マイアプリ」→「</>」ウェブアプリをクリック
+  5. アプリ名を入力して登録
+  6. 表示される firebaseConfig の内容をコピー
+  7. 下の "ここに〇〇" の部分を実際の値に書き換える
+
+  書き換え例：
+    apiKey: "AIzaSyABC123...",
+    authDomain: "my-app.firebaseapp.com",
+    databaseURL: "https://my-app-default-rtdb.asia-southeast1.firebasedatabase.app",
+    ...
+
+▲▲▲ 上の説明を読んでから下を書き換えてください ▲▲▲ -->
+
+<script type="module">
+var firebaseConfig = {
+  apiKey:            "AIzaSyAFrmMUkpBXL-aBBxXjO8HBPOD2glM9jkk",
+  authDomain:        "qrclaud.firebaseapp.com",
+  databaseURL:       "https://qrclaud-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:         "qrclaud",
+  storageBucket:     "qrclaud.firebasestorage.app",
+  messagingSenderId: "1028256471338",
+  appId:             "1:1028256471338:web:539d7dc0e42f988a69e653"
+};
+
+// 設定済みかチェック
+if (!firebaseConfig.apiKey.includes("ここに")) {
+  document.getElementById("setup-banner").classList.add("hidden");
+
+  Promise.all([
+    import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"),
+    import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js")
+  ]).then(function(modules) {
+    var initializeApp = modules[0].initializeApp;
+    var db_module = modules[1];
+    var getDatabase = db_module.getDatabase;
+    var ref = db_module.ref;
+    var push = db_module.push;
+    var serverTimestamp = db_module.serverTimestamp;
+
+    var app = initializeApp(firebaseConfig);
+    var db = getDatabase(app);
+
+    // Firebaseが使える場合はsubmitOrderを上書き
+    window.submitOrder = async function(table, items, total) {
+      var btn = document.getElementById("order-btn");
+      btn.textContent = "送信中...";
+      btn.disabled = true;
+      try {
+        await push(ref(db, "orders"), {
+          table: table,
+          items: items,
+          total: total,
+          status: "new",
+          createdAt: serverTimestamp()
+        });
+        showConfirm();
+      } catch(err) {
+        alert("送信に失敗しました。通信環境をご確認ください。");
+        btn.textContent = "注文を確定する";
+        btn.disabled = false;
+        console.error(err);
+      }
+    };
+  }).catch(function(err){
+    console.error("Firebase読み込みエラー:", err);
+  });
+}
+</script>
+
+</body>
+</html>
