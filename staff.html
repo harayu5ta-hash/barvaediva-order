@@ -176,7 +176,6 @@ projectId:         "qrclaud",
 storageBucket:     "qrclaud.firebasestorage.app",
 messagingSenderId: "1028256471338",
 appId:             "1:1028256471338:web:539d7dc0e42f988a69e653"
-
 };
 
 if (firebaseConfig.apiKey.includes("ここに")) {
@@ -231,7 +230,7 @@ if (firebaseConfig.apiKey.includes("ここに")) {
       document.getElementById("orders-list").style.display = tab==="active"?"grid":"none";
       document.getElementById("history-list").style.display = tab==="history"?"grid":"none";
       document.getElementById("filter-bar").style.display = tab==="active"?"flex":"none";
-      document.getElementById("table-filter-bar").style.display = tab==="active"?"flex":"none";
+      document.getElementById("table-filter-bar").style.display = "flex";
       render();
     };
 
@@ -299,8 +298,11 @@ if (firebaseConfig.apiKey.includes("ここに")) {
         }).join("");
       } else {
         var done=entries.filter(function(e){ return e[1].status==="done"; });
+        if(currentTableFilter!=="all") done=done.filter(function(e){ return String(e[1].table)===currentTableFilter; });
         var hlist=document.getElementById("history-list");
         if(done.length===0){ hlist.innerHTML='<div class="empty">完了した注文はまだありません</div>'; return; }
+        var tableTotal=0;
+        done.forEach(function(entry){ tableTotal+=(entry[1].total||0); });
         hlist.innerHTML=done.map(function(entry){
           var key=entry[0],o=entry[1];
           return '<div class="order-card is-done">' +
@@ -312,7 +314,9 @@ if (firebaseConfig.apiKey.includes("ここに")) {
               return '<div class="item-row"><span class="item-name">'+i.name+'</span><span class="item-qty">×'+i.qty+'</span><span class="item-subtotal">¥'+(i.price*i.qty).toLocaleString()+'</span></div>';
             }).join("")+'</div>' +
           '</div>';
-        }).join("");
+        }).join("")+
+        (done.length>0?'<div style="text-align:right;padding:12px 4px 4px;font-family:var(--font-d);font-size:18px;color:var(--gold);border-top:1px solid var(--border);margin-top:4px">'+
+          (currentTableFilter!=="all"?currentTableFilter+' の合計 ':'完了合計 ')+'¥'+tableTotal.toLocaleString()+'</div>':'');
       }
     }
 
