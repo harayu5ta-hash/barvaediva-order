@@ -414,8 +414,8 @@ if (firebaseConfig.apiKey.includes("ここに")) {
               return '<div class="item-row"><span class="item-name">'+i.name+'</span><span class="item-qty">×'+i.qty+'</span><span class="item-subtotal">¥'+(i.price*i.qty).toLocaleString()+'</span></div>';
             }).join('')+'</div>' +
             '<div class="card-actions">' +
-              (o.status==="new"?'<button class="act-btn act-working" onclick="changeStatus(\'"+key+"\',\'working\')">準備中にする</button>':'')+
-              (o.status==="working"?'<button class="act-btn act-done" onclick="changeStatus(\'"+key+"\',\'done\')">完了にする</button>':'')+
+              (o.status==="new"?'<button class="act-btn act-working" onclick="changeStatus(\''+key+'\',\'working\')">準備中にする</button>':'')+
+              (o.status==="working"?'<button class="act-btn act-done" onclick="changeStatus(\''+key+'\',\'done\')">完了にする</button>':'')+
             '</div>' +
           '</div>';
         }).join("");
