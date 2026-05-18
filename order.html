@@ -450,6 +450,9 @@ function callStaff() {
   toast.classList.add("show");
   setTimeout(function(){ toast.classList.remove("show"); }, 2500);
 
+  // Firebaseに呼び出しを送信
+  if (window._sendCallSignal) window._sendCallSignal();
+
   // ボタンアニメーション
   var btn = document.getElementById("call-btn");
   btn.style.transform = "scale(1.2)";
@@ -550,18 +553,18 @@ function submitOrder(table,items,total){
 }
 </script>
 
-<!-- ★★★ ここにFirebaseの設定を貼り付け ★★★ -->
+<!-- Firebase設定済み -->
 <script type="module">
 var firebaseConfig = {
-apiKey:            "AIzaSyAFrmMUkpBXL-aBBxXjO8HBPOD2glM9jkk",
-authDomain:        "qrclaud.firebaseapp.com",
-databaseURL:       "https://qrclaud-default-rtdb.asia-southeast1.firebasedatabase.app",
-projectId:         "qrclaud",
-storageBucket:     "qrclaud.firebasestorage.app",
-messagingSenderId: "1028256471338",
-appId:             "1:1028256471338:web:539d7dc0e42f988a69e653"
+  apiKey:            "AIzaSyAFrmMUkpBXL-aBBxXjO8HBPOD2glM9jkk",
+  authDomain:        "qrclaud.firebaseapp.com",
+  databaseURL:       "https://qrclaud-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:         "qrclaud",
+  storageBucket:     "qrclaud.firebasestorage.app",
+  messagingSenderId: "1028256471338",
+  appId:             "1:1028256471338:web:539d7dc0e42f988a69e653"
 };
-if(!firebaseConfig.apiKey.includes("ここに")){
+if(firebaseConfig.apiKey){
   Promise.all([
     import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"),
     import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js")
@@ -578,6 +581,16 @@ if(!firebaseConfig.apiKey.includes("ここに")){
         alert("送信に失敗しました。");
         btn.textContent="注文を確定する";btn.disabled=false;
       }
+    };
+    // 店員呼び出しをFirebaseに送信
+    window._sendCallSignal = async function(){
+      var table = new URLSearchParams(location.search).get("table") || "?";
+      try{
+        await m[1].push(m[1].ref(db,"calls"),{
+          table: table,
+          createdAt: m[1].serverTimestamp()
+        });
+      }catch(e){ console.error(e); }
     };
   });
 }

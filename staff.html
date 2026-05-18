@@ -177,7 +177,8 @@ input[type=range]{flex:1;accent-color:var(--accent);height:4px}
 
 <nav class="tab-nav">
   <button class="tab-btn active" onclick="switchTab('active')">対応中</button>
-  <button class="tab-btn" onclick="switchTab('history')">完了履歴</button>
+  <button class="tab-btn" onclick="switchTab('history')">本日の完了</button>
+  <button class="tab-btn" onclick="switchTab('archive')">過去の記録</button>
 </nav>
 
 <div class="filter-bar" id="filter-bar">
@@ -198,6 +199,7 @@ input[type=range]{flex:1;accent-color:var(--accent);height:4px}
 
 <div id="orders-list"><div class="empty">読み込み中...</div></div>
 <div id="history-list" style="display:none"><div class="empty">完了した注文がここに表示されます</div></div>
+<div id="archive-list" style="display:none"><div class="empty">読み込み中...</div></div>
 
 <div id="reset-overlay" style="display:none">
   <div class="reset-box">
@@ -265,24 +267,41 @@ function playRemindSound() {
     osc.stop(ctx.currentTime + 1.0);
   } catch(e) {}
 }
+
+// 店員呼び出し音（明るいチャイム）
+function playCallSound() {
+  if (!document.getElementById("toggle-sound").checked) return;
+  try {
+    var ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [0, 0.15, 0.3, 0.45, 0.6].forEach(function(t, i) {
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = [523, 659, 784, 659, 523][i];
+      osc.type = "sine";
+      gain.gain.setValueAtTime(0, ctx.currentTime + t);
+      gain.gain.linearRampToValueAtTime(0.5, ctx.currentTime + t + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.55);
+      osc.start(ctx.currentTime + t);
+      osc.stop(ctx.currentTime + t + 0.55);
+    });
+  } catch(e) {}
+}
 </script>
 
-<!-- ★★★ ここにFirebaseの設定を貼り付け ★★★
-  order.html と同じ値を下に貼り付けてください -->
+<!-- Firebase設定済み -->
 <script type="module">
 var firebaseConfig = {
-apiKey:            "AIzaSyAFrmMUkpBXL-aBBxXjO8HBPOD2glM9jkk",
-authDomain:        "qrclaud.firebaseapp.com",
-databaseURL:       "https://qrclaud-default-rtdb.asia-southeast1.firebasedatabase.app",
-projectId:         "qrclaud",
-storageBucket:     "qrclaud.firebasestorage.app",
-messagingSenderId: "1028256471338",
-appId:             "1:1028256471338:web:539d7dc0e42f988a69e653"
+  apiKey:            "AIzaSyAFrmMUkpBXL-aBBxXjO8HBPOD2glM9jkk",
+  authDomain:        "qrclaud.firebaseapp.com",
+  databaseURL:       "https://qrclaud-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:         "qrclaud",
+  storageBucket:     "qrclaud.firebasestorage.app",
+  messagingSenderId: "1028256471338",
+  appId:             "1:1028256471338:web:539d7dc0e42f988a69e653"
 };
 
-if (firebaseConfig.apiKey.includes("ここに")) {
-  document.getElementById("orders-list").innerHTML='<div class="empty">Firebase未設定です。staff.htmlをメモ帳で開いてAPIキーを設定してください。</div>';
-} else {
+if (firebaseConfig.apiKey) {
   Promise.all([
     import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"),
     import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js")
@@ -351,13 +370,15 @@ if (firebaseConfig.apiKey.includes("ここに")) {
     window.switchTab = function(tab) {
       currentTab = tab;
       document.querySelectorAll(".tab-btn").forEach(function(b,i){
-        b.classList.toggle("active",(i===0&&tab==="active")||(i===1&&tab==="history"));
+        b.classList.toggle("active",(i===0&&tab==="active")||(i===1&&tab==="history")||(i===2&&tab==="archive"));
       });
       document.getElementById("orders-list").style.display = tab==="active"?"grid":"none";
       document.getElementById("history-list").style.display = tab==="history"?"grid":"none";
+      document.getElementById("archive-list").style.display = tab==="archive"?"block":"none";
       document.getElementById("filter-bar").style.display = tab==="active"?"flex":"none";
-      document.getElementById("table-filter-bar").style.display = "flex";
-      render();
+      document.getElementById("table-filter-bar").style.display = tab!=="archive"?"flex":"none";
+      if(tab==="archive") loadArchive();
+      else render();
     };
 
     window.changeStatus = function(key, status) {
@@ -369,11 +390,21 @@ if (firebaseConfig.apiKey.includes("ここに")) {
     window.hideReset = function() { document.getElementById("reset-overlay").style.display="none"; };
     window.doReset = async function() {
       try {
+        // 完了済み注文を日付ごとにアーカイブ保存
+        var today = new Date();
+        var dateKey = today.getFullYear()+"-"+String(today.getMonth()+1).padStart(2,"0")+"-"+String(today.getDate()).padStart(2,"0");
+        var doneOrders = Object.entries(allOrders).filter(function(e){ return e[1].status==="done"; });
+        if (doneOrders.length > 0) {
+          var archiveData = {};
+          doneOrders.forEach(function(e){ archiveData[e[0]] = e[1]; });
+          await m.set(m.ref(db,"archive/"+dateKey), archiveData);
+        }
         await m.remove(m.ref(db,"orders"));
+        await m.remove(m.ref(db,"calls"));
         document.getElementById("reset-overlay").style.display="none";
         allOrders={}; remindedKeys={};
         render();
-      } catch(err) { alert("リセットに失敗しました。"); }
+      } catch(err) { alert("リセットに失敗しました。"+err); }
     };
 
     function render() {
@@ -458,6 +489,58 @@ if (firebaseConfig.apiKey.includes("ここに")) {
       render();
       checkRemind();
     });
+
+    // 店員呼び出し受信
+    var knownCalls = {};
+    m.onValue(m.query(m.ref(db,"calls"),m.orderByChild("createdAt")), function(snap) {
+      var calls = snap.val() || {};
+      Object.entries(calls).forEach(function(entry){
+        var k=entry[0], c=entry[1];
+        if (!knownCalls[k]) {
+          knownCalls[k] = true;
+          // 初回ロード時は無視（既存の呼び出しは通知しない）
+          if (Object.keys(knownCalls).length > 1 || Date.now() - (c.createdAt||0) < 10000) {
+            playCallSound();
+            showToast("🔔 Table "+c.table+" — スタッフを呼んでいます！");
+            if(notifGranted && document.getElementById("toggle-notif").checked){
+              new Notification("barvaediva — 呼び出し",{body:"Table "+c.table+" がスタッフを呼んでいます"});
+            }
+          }
+        }
+      });
+    });
+
+    // 過去のアーカイブを読み込んで表示
+    function loadArchive() {
+      var el = document.getElementById("archive-list");
+      el.innerHTML = '<div class="empty">読み込み中...</div>';
+      m.get(m.ref(db,"archive")).then(function(snap) {
+        var data = snap.val();
+        if (!data) { el.innerHTML='<div class="empty">過去の記録はありません</div>'; return; }
+        var dates = Object.keys(data).sort().reverse();
+        el.innerHTML = dates.map(function(date) {
+          var orders = Object.values(data[date]);
+          var dayTotal = orders.reduce(function(s,o){ return s+(o.total||0); },0);
+          return '<div style="margin-bottom:20px">'+
+            '<div style="padding:10px 16px;background:var(--surface);border:1px solid var(--border);border-bottom:none;display:flex;justify-content:space-between;align-items:center">'+
+              '<span style="font-family:var(--font-d);font-size:18px;color:var(--accent)">'+date+'</span>'+
+              '<span style="font-family:var(--font-d);font-size:16px;color:var(--brown)">合計 ¥'+dayTotal.toLocaleString()+'</span>'+
+            '</div>'+
+            orders.map(function(o){
+              return '<div class="order-card is-done" style="border-radius:0;border-top:none">'+
+                '<div class="card-header">'+
+                  '<div class="card-left"><span class="table-num">Table '+o.table+'</span><span class="status-badge status-done">完了</span></div>'+
+                  '<div class="card-right"><span class="total-price">¥'+(o.total||0).toLocaleString()+'</span></div>'+
+                '</div>'+
+                '<div class="item-list">'+(o.items||[]).map(function(i){
+                  return '<div class="item-row"><span class="item-name">'+i.name+'</span><span class="item-qty">×'+i.qty+'</span><span class="item-subtotal">¥'+(i.price*i.qty).toLocaleString()+'</span></div>';
+                }).join('')+'</div>'+
+              '</div>';
+            }).join('')+
+          '</div>';
+        }).join("");
+      }).catch(function(){ el.innerHTML='<div class="empty">読み込みに失敗しました</div>'; });
+    }
 
     setInterval(function(){ render(); checkRemind(); }, 30000);
   });
