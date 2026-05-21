@@ -494,6 +494,7 @@ if (firebaseConfig.apiKey) {
             '<div class="item-list">'+(o.items||[]).map(function(i){
               return '<div class="item-row"><span class="item-name">'+i.name+'</span><span class="item-qty">×'+i.qty+'</span><span class="item-subtotal">¥'+(i.price*i.qty).toLocaleString()+'</span></div>';
             }).join('')+'</div>' +
+            '<div class="card-actions"><button class="act-btn act-reset-table" onclick="resetTable(\''+o.table+'\')">席リセット</button></div>'+
           '</div>';
         }).join("")+
         (done.length>0?'<div style="text-align:right;padding:12px 4px 4px;font-family:var(--font-d);font-size:18px;color:var(--accent);border-top:1px solid var(--border);margin-top:4px">'+(currentTableFilter!=="all"?currentTableFilter+' の合計 ':'完了合計 ')+'¥'+tableTotal.toLocaleString()+'</div>':'');
