@@ -92,6 +92,8 @@ input[type=range]{flex:1;accent-color:var(--accent);height:4px}
 .act-working:hover{background:rgba(138,96,32,.08)}
 .act-done{color:var(--green);border-color:rgba(58,122,74,.4)}
 .act-done:hover{background:rgba(58,122,74,.08)}
+.act-reset-table{color:var(--muted);border-color:var(--border);font-size:10px;padding:5px 12px;margin-left:auto}
+.act-reset-table:hover{background:var(--border2);color:var(--red)}
 .done-label{font-size:11px;color:var(--green);letter-spacing:.08em}
 .empty{text-align:center;padding:50px 20px;color:var(--muted);font-size:13px;border:1px dashed var(--border);border-radius:2px}
 
@@ -382,8 +384,32 @@ if (firebaseConfig.apiKey) {
     };
 
     window.changeStatus = function(key, status) {
-      if (status==="done") remindedKeys[key]=true; // 完了したらリマインド解除
+      if (status==="done") remindedKeys[key]=true;
       m.update(m.ref(db,"orders/"+key),{status:status});
+    };
+
+    // テーブルごとリセット
+    window.resetTable = async function(table) {
+      if (!confirm("Table "+table+" の注文をリセットしますか？\n（アーカイブに保存してから削除します）")) return;
+      try {
+        var today = new Date();
+        var dateKey = today.getFullYear()+"-"+String(today.getMonth()+1).padStart(2,"0")+"-"+String(today.getDate()).padStart(2,"0");
+        var tableOrders = Object.entries(allOrders).filter(function(e){ return String(e[1].table)===String(table); });
+        if (tableOrders.length > 0) {
+          var archiveData = {};
+          tableOrders.forEach(function(e){ archiveData[e[0]] = e[1]; });
+          // 既存アーカイブにマージ
+          var existSnap = await m.get(m.ref(db,"archive/"+dateKey));
+          var existing = existSnap.val() || {};
+          Object.assign(existing, archiveData);
+          await m.set(m.ref(db,"archive/"+dateKey), existing);
+          // 削除
+          for (var e of tableOrders) {
+            await m.remove(m.ref(db,"orders/"+e[0]));
+          }
+        }
+        showToast("Table "+table+" をリセットしました");
+      } catch(err) { alert("リセットに失敗しました。"+err); }
     };
 
     window.showReset = function() { document.getElementById("reset-overlay").style.display="flex"; };
@@ -447,6 +473,7 @@ if (firebaseConfig.apiKey) {
             '<div class="card-actions">' +
               (o.status==="new"?'<button class="act-btn act-working" onclick="changeStatus(\''+key+'\',\'working\')">準備中にする</button>':'')+
               (o.status==="working"?'<button class="act-btn act-done" onclick="changeStatus(\''+key+'\',\'done\')">完了にする</button>':'')+
+              '<button class="act-btn act-reset-table" onclick="resetTable(\''+o.table+'\')">席リセット</button>'+
             '</div>' +
           '</div>';
         }).join("");
