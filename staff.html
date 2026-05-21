@@ -94,6 +94,8 @@ input[type=range]{flex:1;accent-color:var(--accent);height:4px}
 .act-done:hover{background:rgba(58,122,74,.08)}
 .act-reset-table{color:var(--muted);border-color:var(--border);font-size:10px;padding:5px 12px;margin-left:auto}
 .act-reset-table:hover{background:var(--border2);color:var(--red)}
+.act-cancel{color:var(--red);border-color:rgba(176,48,48,.3);font-size:10px;padding:5px 12px;margin-left:auto}
+.act-cancel:hover{background:rgba(176,48,48,.08)}
 .done-label{font-size:11px;color:var(--green);letter-spacing:.08em}
 .empty{text-align:center;padding:50px 20px;color:var(--muted);font-size:13px;border:1px dashed var(--border);border-radius:2px}
 
@@ -388,6 +390,15 @@ if (firebaseConfig.apiKey) {
       m.update(m.ref(db,"orders/"+key),{status:status});
     };
 
+    // 注文取消（対応中から削除）
+    window.cancelOrder = async function(key, table) {
+      if (!confirm("Table "+table+" の注文を取り消しますか？\n（この操作は元に戻せません）")) return;
+      try {
+        await m.remove(m.ref(db,"orders/"+key));
+        showToast("Table "+table+" の注文を取り消しました");
+      } catch(err) { alert("取消に失敗しました。"); }
+    };
+
     // テーブルごとリセット
     window.resetTable = async function(table) {
       if (!confirm("Table "+table+" の注文をリセットしますか？\n（アーカイブに保存してから削除します）")) return;
@@ -473,7 +484,7 @@ if (firebaseConfig.apiKey) {
             '<div class="card-actions">' +
               (o.status==="new"?'<button class="act-btn act-working" onclick="changeStatus(\''+key+'\',\'working\')">準備中にする</button>':'')+
               (o.status==="working"?'<button class="act-btn act-done" onclick="changeStatus(\''+key+'\',\'done\')">完了にする</button>':'')+
-              '<button class="act-btn act-reset-table" onclick="resetTable(\''+o.table+'\')">席リセット</button>'+
+              '<button class="act-btn act-cancel" onclick="cancelOrder(\''+key+'\',\''+o.table+'\')">注文取消</button>'+
             '</div>' +
           '</div>';
         }).join("");
@@ -482,21 +493,41 @@ if (firebaseConfig.apiKey) {
         if(currentTableFilter!=="all") done=done.filter(function(e){ return String(e[1].table)===currentTableFilter; });
         var hlist=document.getElementById("history-list");
         if(done.length===0){ hlist.innerHTML='<div class="empty">完了した注文はまだありません</div>'; return; }
-        var tableTotal=0;
-        done.forEach(function(entry){ tableTotal+=(entry[1].total||0); });
-        hlist.innerHTML=done.map(function(entry){
-          var key=entry[0],o=entry[1];
-          return '<div class="order-card is-done">' +
-            '<div class="card-header">' +
-              '<div class="card-left"><span class="table-num">Table '+o.table+'</span><span class="status-badge status-done">完了</span></div>' +
-              '<div class="card-right"><span class="time-ago">'+timeAgo(o.createdAt)+'</span><span class="total-price">¥'+(o.total||0).toLocaleString()+'</span></div>' +
-            '</div>' +
-            '<div class="item-list">'+(o.items||[]).map(function(i){
-              return '<div class="item-row"><span class="item-name">'+i.name+'</span><span class="item-qty">×'+i.qty+'</span><span class="item-subtotal">¥'+(i.price*i.qty).toLocaleString()+'</span></div>';
-            }).join('')+'</div>' +
+
+        // テーブルごとにグループ化
+        var tableGroups={};
+        done.forEach(function(entry){
+          var t=String(entry[1].table);
+          if(!tableGroups[t]) tableGroups[t]=[];
+          tableGroups[t].push(entry);
+        });
+
+        hlist.innerHTML=Object.entries(tableGroups).map(function(tg){
+          var tname=tg[0], tEntries=tg[1];
+          var tTotal=tEntries.reduce(function(s,e){ return s+(e[1].total||0); },0);
+          return '<div style="margin-bottom:16px">'+
+            '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 14px;background:var(--border2);border:1px solid var(--border);border-bottom:none">'+
+              '<span style="font-family:var(--font-d);font-size:18px;color:var(--accent)">Table '+tname+'</span>'+
+              '<div style="display:flex;align-items:center;gap:12px">'+
+                '<span style="font-family:var(--font-d);font-size:16px;color:var(--brown)">¥'+tTotal.toLocaleString()+'</span>'+
+                '<button class="act-btn act-reset-table" onclick="resetTable(\''+tname+'\')">席リセット</button>'+
+              '</div>'+
+            '</div>'+
+            tEntries.map(function(entry){
+              var key=entry[0],o=entry[1];
+              return '<div class="order-card is-done" style="border-top:none">'+
+                '<div class="card-header">'+
+                  '<div class="card-left"><span class="status-badge status-done">完了</span></div>'+
+                  '<div class="card-right"><span class="time-ago">'+timeAgo(o.createdAt)+'</span><span class="total-price">¥'+(o.total||0).toLocaleString()+'</span></div>'+
+                '</div>'+
+                '<div class="item-list">'+(o.items||[]).map(function(i){
+                  return '<div class="item-row"><span class="item-name">'+i.name+'</span><span class="item-qty">×'+i.qty+'</span><span class="item-subtotal">¥'+(i.price*i.qty).toLocaleString()+'</span></div>';
+                }).join('')+'</div>'+
+              '</div>';
+            }).join('')+
           '</div>';
         }).join("")+
-        (done.length>0?'<div style="text-align:right;padding:12px 4px 4px;font-family:var(--font-d);font-size:18px;color:var(--accent);border-top:1px solid var(--border);margin-top:4px">'+(currentTableFilter!=="all"?currentTableFilter+' の合計 ':'完了合計 ')+'¥'+tableTotal.toLocaleString()+'</div>':'');
+        '<div style="text-align:right;padding:12px 4px 4px;font-family:var(--font-d);font-size:18px;color:var(--accent);border-top:1px solid var(--border);margin-top:4px">'+(currentTableFilter!=="all"?currentTableFilter+' の合計 ':'完了合計 ')+'¥'+done.reduce(function(s,e){ return s+(e[1].total||0); },0).toLocaleString()+'</div>';
       }
     }
 
@@ -554,10 +585,19 @@ if (firebaseConfig.apiKey) {
               '<span style="font-family:var(--font-d);font-size:16px;color:var(--brown)">合計 ¥'+dayTotal.toLocaleString()+'</span>'+
             '</div>'+
             orders.map(function(o){
-              return '<div class="order-card is-done" style="border-radius:0;border-top:none">'+
+              // 注文時間を表示
+              var orderTime = "";
+              if(o.createdAt){
+                var d = new Date(o.createdAt);
+                orderTime = d.getHours()+":"+String(d.getMinutes()).padStart(2,"0");
+              }
+              return '<div class="order-card is-done" style="border-top:none">'+
                 '<div class="card-header">'+
                   '<div class="card-left"><span class="table-num">Table '+o.table+'</span><span class="status-badge status-done">完了</span></div>'+
-                  '<div class="card-right"><span class="total-price">¥'+(o.total||0).toLocaleString()+'</span></div>'+
+                  '<div class="card-right">'+
+                    (orderTime?'<span style="font-size:13px;color:var(--muted)">'+orderTime+'</span>':'')+
+                    '<span class="total-price">¥'+(o.total||0).toLocaleString()+'</span>'+
+                  '</div>'+
                 '</div>'+
                 '<div class="item-list">'+(o.items||[]).map(function(i){
                   return '<div class="item-row"><span class="item-name">'+i.name+'</span><span class="item-qty">×'+i.qty+'</span><span class="item-subtotal">¥'+(i.price*i.qty).toLocaleString()+'</span></div>';
