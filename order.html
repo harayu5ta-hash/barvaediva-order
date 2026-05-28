@@ -189,6 +189,19 @@ header::after{content:'';display:block;height:1px;background:var(--border2);marg
 }
 #call-toast.show{opacity:1;transform:translateY(0)}
 
+
+/* セッション無効オーバーレイ */
+#session-blocked{
+  display:none;
+  position:fixed;inset:0;
+  background:rgba(245,240,232,0.97);
+  align-items:center;justify-content:center;
+  z-index:200;flex-direction:column;gap:16px;
+  text-align:center;padding:32px;
+}
+.blocked-icon{font-size:48px}
+.blocked-title{font-family:var(--font-d);font-size:26px;color:var(--brown)}
+.blocked-msg{font-size:13px;color:var(--muted);line-height:1.8}
 </style>
 </head>
 <body>
@@ -402,6 +415,13 @@ header::after{content:'';display:block;height:1px;background:var(--border2);marg
 </div>
 <div id="call-toast">スタッフを呼びました！</div>
 
+
+<div id="session-blocked">
+  <div class="blocked-icon">🔒</div>
+  <p class="blocked-title">現在この席はご利用いただけません</p>
+  <p class="blocked-msg">スタッフにお声がけください</p>
+</div>
+
 <div id="cart-bar" style="opacity:.4">
   <div class="cart-summary">
     <div>
@@ -571,17 +591,72 @@ if(firebaseConfig.apiKey){
   ]).then(function(m){
     var app=m[0].initializeApp(firebaseConfig);
     var db=m[1].getDatabase(app);
+
+    // URLからsession_idとtableを取得
+    var params = new URLSearchParams(location.search);
+    var urlTable = params.get("table") || "?";
+    var urlSession = params.get("sid") || "";
+
+    // セッション状態をリアルタイム監視
+    m[1].onValue(m[1].ref(db, "sessions/table_"+urlTable), function(snap){
+      var session = snap.val();
+      var menuEl = document.getElementById("menu-list");
+      var cartBar = document.getElementById("cart-bar");
+      var blocked = document.getElementById("session-blocked");
+
+      if(!session || !session.active){
+        // 未開始 or 終了済み
+        if(menuEl) menuEl.style.opacity="0.3";
+        if(cartBar) cartBar.style.display="none";
+        if(blocked) blocked.style.display="flex";
+      } else if(urlSession && session.session_id !== urlSession){
+        // session_idが一致しない（古いQR・別グループ）
+        if(menuEl) menuEl.style.opacity="0.3";
+        if(cartBar) cartBar.style.display="none";
+        if(blocked){
+          blocked.style.display="flex";
+          var msg = blocked.querySelector(".blocked-msg");
+          if(msg) msg.textContent="このQRコードは無効です。スタッフにお声がけください。";
+        }
+      } else {
+        // 有効なセッション
+        if(menuEl) menuEl.style.opacity="1";
+        if(cartBar) cartBar.style.display="block";
+        if(blocked) blocked.style.display="none";
+        // session_idをページに保持
+        window._currentSessionId = session.session_id;
+      }
+    });
+
     window.submitOrder=async function(table,items,total){
       var btn=document.getElementById("order-btn");
       btn.textContent="送信中...";btn.disabled=true;
       try{
-        await m[1].push(m[1].ref(db,"orders"),{table,items,total,status:"new",createdAt:m[1].serverTimestamp()});
+        // セッション確認
+        var sessionSnap = await m[1].get(m[1].ref(db,"sessions/table_"+table));
+        var session = sessionSnap.val();
+        if(!session || !session.active){
+          alert("現在この席は利用できません。スタッフをお呼びください。");
+          btn.textContent="注文を確定する";btn.disabled=false;
+          return;
+        }
+        if(urlSession && session.session_id !== urlSession){
+          alert("このQRコードは無効です。スタッフにお声がけください。");
+          btn.textContent="注文を確定する";btn.disabled=false;
+          return;
+        }
+        await m[1].push(m[1].ref(db,"orders"),{
+          table, items, total, status:"new",
+          session_id: session.session_id,
+          createdAt: m[1].serverTimestamp()
+        });
         showConfirm(items,total);
       }catch(err){
         alert("送信に失敗しました。");
         btn.textContent="注文を確定する";btn.disabled=false;
       }
     };
+
     // 店員呼び出しをFirebaseに送信
     window._sendCallSignal = async function(){
       var table = new URLSearchParams(location.search).get("table") || "?";

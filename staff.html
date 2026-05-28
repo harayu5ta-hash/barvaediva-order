@@ -125,6 +125,21 @@ input[type=range]{flex:1;accent-color:var(--accent);height:4px}
   white-space:nowrap;pointer-events:none;
 }
 #toast.show{transform:translateX(-50%) translateY(0)}
+
+/* 席管理パネル */
+#seat-panel{padding:12px 16px;max-width:600px;margin:0 auto;display:none;gap:10px;flex-direction:column}
+#seat-panel.active{display:flex}
+.seat-card{background:var(--surface);border:1px solid var(--border);padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.seat-name{font-family:var(--font-d);font-size:18px;color:var(--brown)}
+.seat-status{font-size:10px;letter-spacing:.1em;padding:2px 10px;border-radius:2px}
+.seat-active{background:rgba(58,122,74,.1);color:var(--green);border:1px solid rgba(58,122,74,.3)}
+.seat-inactive{background:var(--border2);color:var(--muted);border:1px solid var(--border)}
+.seat-actions{display:flex;gap:8px;align-items:center}
+.seat-start{padding:6px 16px;border:1px solid rgba(58,122,74,.4);background:transparent;color:var(--green);font-size:11px;cursor:pointer;border-radius:2px;font-family:var(--font-b);transition:background .2s}
+.seat-start:hover{background:rgba(58,122,74,.08)}
+.seat-end{padding:6px 16px;border:1px solid rgba(176,48,48,.4);background:transparent;color:var(--red);font-size:11px;cursor:pointer;border-radius:2px;font-family:var(--font-b);transition:background .2s}
+.seat-end:hover{background:rgba(176,48,48,.08)}
+.seat-sid{font-size:9px;color:var(--muted);margin-top:2px;letter-spacing:.05em}
 </style>
 </head>
 <body>
@@ -182,6 +197,7 @@ input[type=range]{flex:1;accent-color:var(--accent);height:4px}
 <nav class="tab-nav">
   <button class="tab-btn active" onclick="switchTab('active')">対応中</button>
   <button class="tab-btn" onclick="switchTab('history')">本日の完了</button>
+  <button class="tab-btn" onclick="switchTab('seats')">席管理</button>
   <button class="tab-btn" onclick="switchTab('archive')">過去の記録</button>
 </nav>
 
@@ -199,6 +215,76 @@ input[type=range]{flex:1;accent-color:var(--accent);height:4px}
   <button class="table-btn" onclick="setTableFilter('counter1',this)">Counter 1</button>
   <button class="table-btn" onclick="setTableFilter('counter2',this)">Counter 2</button>
   <button class="table-btn" onclick="setTableFilter('counter3',this)">Counter 3</button>
+</div>
+
+
+<div id="seat-panel">
+  <div class="seat-card" id="seat-1">
+    <div>
+      <div class="seat-name">Table 1</div>
+      <div class="seat-sid" id="sid-1">—</div>
+    </div>
+    <div class="seat-actions">
+      <span class="seat-status seat-inactive" id="sstat-1">未使用</span>
+      <button class="seat-start" id="sbtn-start-1" onclick="startSeat('1')">利用開始</button>
+      <button class="seat-end" id="sbtn-end-1" onclick="endSeat('1')" style="display:none">利用終了</button>
+    </div>
+  </div>
+  <div class="seat-card" id="seat-2">
+    <div>
+      <div class="seat-name">Table 2</div>
+      <div class="seat-sid" id="sid-2">—</div>
+    </div>
+    <div class="seat-actions">
+      <span class="seat-status seat-inactive" id="sstat-2">未使用</span>
+      <button class="seat-start" id="sbtn-start-2" onclick="startSeat('2')">利用開始</button>
+      <button class="seat-end" id="sbtn-end-2" onclick="endSeat('2')" style="display:none">利用終了</button>
+    </div>
+  </div>
+  <div class="seat-card" id="seat-3">
+    <div>
+      <div class="seat-name">Table 3</div>
+      <div class="seat-sid" id="sid-3">—</div>
+    </div>
+    <div class="seat-actions">
+      <span class="seat-status seat-inactive" id="sstat-3">未使用</span>
+      <button class="seat-start" id="sbtn-start-3" onclick="startSeat('3')">利用開始</button>
+      <button class="seat-end" id="sbtn-end-3" onclick="endSeat('3')" style="display:none">利用終了</button>
+    </div>
+  </div>
+  <div class="seat-card" id="seat-counter1">
+    <div>
+      <div class="seat-name">Counter 1</div>
+      <div class="seat-sid" id="sid-counter1">—</div>
+    </div>
+    <div class="seat-actions">
+      <span class="seat-status seat-inactive" id="sstat-counter1">未使用</span>
+      <button class="seat-start" id="sbtn-start-counter1" onclick="startSeat('counter1')">利用開始</button>
+      <button class="seat-end" id="sbtn-end-counter1" onclick="endSeat('counter1')" style="display:none">利用終了</button>
+    </div>
+  </div>
+  <div class="seat-card" id="seat-counter2">
+    <div>
+      <div class="seat-name">Counter 2</div>
+      <div class="seat-sid" id="sid-counter2">—</div>
+    </div>
+    <div class="seat-actions">
+      <span class="seat-status seat-inactive" id="sstat-counter2">未使用</span>
+      <button class="seat-start" id="sbtn-start-counter2" onclick="startSeat('counter2')">利用開始</button>
+      <button class="seat-end" id="sbtn-end-counter2" onclick="endSeat('counter2')" style="display:none">利用終了</button>
+    </div>
+  </div>
+  <div class="seat-card" id="seat-counter3">
+    <div>
+      <div class="seat-name">Counter 3</div>
+      <div class="seat-sid" id="sid-counter3">—</div>
+    </div>
+    <div class="seat-actions">
+      <span class="seat-status seat-inactive" id="sstat-counter3">未使用</span>
+      <button class="seat-start" id="sbtn-start-counter3" onclick="startSeat('counter3')">利用開始</button>
+      <button class="seat-end" id="sbtn-end-counter3" onclick="endSeat('counter3')" style="display:none">利用終了</button>
+    </div>
+  </div>
 </div>
 
 <div id="orders-list"><div class="empty">読み込み中...</div></div>
@@ -374,15 +460,70 @@ if (firebaseConfig.apiKey) {
     window.switchTab = function(tab) {
       currentTab = tab;
       document.querySelectorAll(".tab-btn").forEach(function(b,i){
-        b.classList.toggle("active",(i===0&&tab==="active")||(i===1&&tab==="history")||(i===2&&tab==="archive"));
+        b.classList.toggle("active",
+          (i===0&&tab==="active")||(i===1&&tab==="history")||
+          (i===2&&tab==="seats")||(i===3&&tab==="archive")
+        );
       });
       document.getElementById("orders-list").style.display = tab==="active"?"grid":"none";
       document.getElementById("history-list").style.display = tab==="history"?"grid":"none";
       document.getElementById("archive-list").style.display = tab==="archive"?"block":"none";
+      document.getElementById("seat-panel").classList.toggle("active", tab==="seats");
       document.getElementById("filter-bar").style.display = tab==="active"?"flex":"none";
-      document.getElementById("table-filter-bar").style.display = tab!=="archive"?"flex":"none";
+      document.getElementById("table-filter-bar").style.display = (tab==="active"||tab==="history")?"flex":"none";
       if(tab==="archive") loadArchive();
       else render();
+    };
+
+    // セッション状態をリアルタイム監視してUI更新
+    m[1].onValue(m[1].ref(db,"sessions"), function(snap){
+      var sessions = snap.val() || {};
+      ["1","2","3","counter1","counter2","counter3"].forEach(function(t){
+        var s = sessions["table_"+t] || {};
+        var statEl = document.getElementById("sstat-"+t);
+        var sidEl  = document.getElementById("sid-"+t);
+        var startBtn = document.getElementById("sbtn-start-"+t);
+        var endBtn   = document.getElementById("sbtn-end-"+t);
+        if(!statEl) return;
+        if(s.active){
+          statEl.textContent="利用中";
+          statEl.className="seat-status seat-active";
+          if(startBtn) startBtn.style.display="none";
+          if(endBtn)   endBtn.style.display="inline-block";
+          if(sidEl)    sidEl.textContent="ID: "+(s.session_id||"").slice(0,8)+"…";
+        } else {
+          statEl.textContent="未使用";
+          statEl.className="seat-status seat-inactive";
+          if(startBtn) startBtn.style.display="inline-block";
+          if(endBtn)   endBtn.style.display="none";
+          if(sidEl)    sidEl.textContent="—";
+        }
+      });
+    });
+
+    // 利用開始 — 新しいsession_idを生成してFirebaseに保存
+    window.startSeat = async function(table) {
+      var sid = Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+      try {
+        await m[1].set(m[1].ref(db,"sessions/table_"+table), {
+          session_id: sid,
+          active: true,
+          started_at: m[1].serverTimestamp()
+        });
+        showToast("Table "+table+" 利用開始しました");
+      } catch(e){ alert("エラー: "+e); }
+    };
+
+    // 利用終了 — sessionをfalseに
+    window.endSeat = async function(table) {
+      if(!confirm("Table "+table+" の利用を終了しますか？\n注文できなくなります。")) return;
+      try {
+        await m[1].update(m[1].ref(db,"sessions/table_"+table), {
+          active: false,
+          ended_at: m[1].serverTimestamp()
+        });
+        showToast("Table "+table+" 利用終了しました");
+      } catch(e){ alert("エラー: "+e); }
     };
 
     window.changeStatus = function(key, status) {
