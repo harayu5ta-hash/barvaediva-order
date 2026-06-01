@@ -126,14 +126,19 @@ header::after{content:'';display:block;height:1px;background:var(--border2);marg
 #order-btn:active:not(:disabled){transform:scale(.98)}
 #order-btn:disabled{opacity:.3;cursor:default}
 
-/* HISTORY */
-#history-list{padding:16px;max-width:520px;margin:0 auto}
+/* 注文履歴カード */
 .history-card{background:var(--surface);border:1px solid var(--border);padding:14px;margin-bottom:10px}
 .history-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding-bottom:8px;border-bottom:1px dashed var(--border2)}
 .history-time{font-size:11px;color:var(--muted)}
 .history-total{font-family:var(--font-d);font-size:18px;color:var(--accent)}
 .history-item{font-size:12px;color:var(--muted);padding:3px 0;display:flex;justify-content:space-between}
 .history-item span{color:var(--brown)}
+.history-status{display:inline-block;font-size:10px;letter-spacing:.1em;padding:2px 10px;border-radius:2px;margin-top:6px}
+.hstat-new{background:rgba(176,48,48,.1);color:#b03030;border:1px solid rgba(176,48,48,.3)}
+.hstat-working{background:rgba(138,96,32,.1);color:#8a6020;border:1px solid rgba(138,96,32,.3)}
+.hstat-done{background:rgba(58,122,74,.1);color:#3a7a4a;border:1px solid rgba(58,122,74,.25)}
+.history-cancel{margin-top:8px;padding:5px 14px;border:1px solid rgba(176,48,48,.3);background:transparent;color:#b03030;font-size:11px;cursor:pointer;border-radius:2px;font-family:var(--font-b);transition:background .2s}
+.history-cancel:hover{background:rgba(176,48,48,.08)}
 .empty-history{text-align:center;padding:50px 20px;color:var(--muted);font-size:13px}
 
 /* CONFIRM */
@@ -547,25 +552,22 @@ document.getElementById("close-confirm").addEventListener("click",function(){
 });
 
 function showConfirm(items,total){
-  var now=new Date();
-  var t=now.getHours()+":"+String(now.getMinutes()).padStart(2,"0");
-  orderHistory.push({time:t,items:items,total:total});
-  sessionStorage.setItem("orderHistory",JSON.stringify(orderHistory));
   cart={};updateCart();
   var ov=document.getElementById("confirm-overlay");
   ov.style.display="flex";
   setTimeout(function(){ov.style.opacity="1";},10);
+  // 新しい注文を監視開始
+  if(window._startWatchingLatestOrder) window._startWatchingLatestOrder();
 }
 
 function renderHistory(){
+  // Firebaseからリアルタイム取得するため、ここではプレースホルダーだけ表示
   var el=document.getElementById("history-list");
-  if(orderHistory.length===0){el.innerHTML='<div class="empty-history">まだ注文履歴がありません</div>';return;}
-  el.innerHTML=orderHistory.slice().reverse().map(function(o){
-    return '<div class="history-card">'+
-      '<div class="history-head"><span class="history-time">'+o.time+'</span><span class="history-total">¥'+o.total.toLocaleString()+'</span></div>'+
-      o.items.map(function(i){return '<div class="history-item"><span>'+i.name+' ×'+i.qty+'</span><span>¥'+(i.price*i.qty).toLocaleString()+'</span></div>';}).join("")+
-    '</div>';
-  }).join("");
+  if(!window._myOrderKeys || window._myOrderKeys.length===0){
+    el.innerHTML='<div class="empty-history">まだ注文履歴がありません</div>';
+    return;
+  }
+  if(window._renderHistoryFromFirebase) window._renderHistoryFromFirebase();
 }
 
 function submitOrder(table,items,total){
@@ -647,16 +649,116 @@ if(firebaseConfig.apiKey){
           btn.textContent="注文を確定する";btn.disabled=false;
           return;
         }
-        await m.push(m.ref(db,"orders"),{
+        var newRef = await m.push(m.ref(db,"orders"),{
           table, items, total, status:"new",
           session_id: session.session_id,
           createdAt: m.serverTimestamp()
         });
+        // 注文キーを保持
+        if(!window._myOrderKeys) window._myOrderKeys=[];
+        window._myOrderKeys.push(newRef.key);
+        sessionStorage.setItem("myOrderKeys", JSON.stringify(window._myOrderKeys));
         showConfirm(items,total);
       }catch(err){
         alert("送信に失敗しました。");
         btn.textContent="注文を確定する";btn.disabled=false;
       }
+    };
+
+    // 自分の注文をリアルタイム監視
+    window._myOrderKeys = JSON.parse(sessionStorage.getItem("myOrderKeys")||"[]");
+
+    function watchMyOrders(){
+      if(!window._myOrderKeys || window._myOrderKeys.length===0) return;
+      window._myOrderKeys.forEach(function(key){
+        m.onValue(m.ref(db,"orders/"+key), function(snap){
+          window._orderCache = window._orderCache || {};
+          if(snap.val()){
+            window._orderCache[key] = snap.val();
+            window._orderCache[key]._key = key;
+          } else {
+            delete window._orderCache[key];
+          }
+          if(window._renderHistoryFromFirebase) window._renderHistoryFromFirebase();
+        });
+      });
+    }
+
+    var statusLabel = {new:"受付中",working:"準備中",done:"提供済み"};
+    var statusClass = {new:"hstat-new",working:"hstat-working",done:"hstat-done"};
+
+    window._renderHistoryFromFirebase = function(){
+      var el = document.getElementById("history-list");
+      var cache = window._orderCache || {};
+      var orders = Object.values(cache).sort(function(a,b){
+        return (b.createdAt||0)-(a.createdAt||0);
+      });
+      if(orders.length===0){
+        el.innerHTML='<div class="empty-history">まだ注文履歴がありません</div>';
+        return;
+      }
+      el.innerHTML = orders.map(function(o){
+        var now = new Date();
+        var t = o.createdAt ? new Date(o.createdAt) : now;
+        var timeStr = t.getHours()+":"+String(t.getMinutes()).padStart(2,"0");
+        var canCancel = o.status==="new";
+        return '<div class="history-card">'+
+          '<div class="history-head">'+
+            '<span class="history-time">'+timeStr+'</span>'+
+            '<span class="history-total">¥'+o.total.toLocaleString()+'</span>'+
+          '</div>'+
+          o.items.map(function(i){
+            return '<div class="history-item"><span>'+i.name+' ×'+i.qty+'</span><span>¥'+(i.price*i.qty).toLocaleString()+'</span></div>';
+          }).join("")+
+          '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px">'+
+            '<span class="history-status '+(statusClass[o.status]||'hstat-new')+'">'+(statusLabel[o.status]||o.status)+'</span>'+
+            (canCancel?'<button class="history-cancel" onclick="cancelMyOrder(\''+o._key+'\')">キャンセル</button>':'')+
+          '</div>'+
+        '</div>';
+      }).join("");
+    };
+
+    window.cancelMyOrder = async function(key){
+      if(!confirm("この注文をキャンセルしますか？")) return;
+      try{
+        var snap = await m.get(m.ref(db,"orders/"+key));
+        var order = snap.val();
+        if(!order){ alert("注文が見つかりません。"); return; }
+        if(order.status !== "new"){
+          alert("すでに準備が始まっているためキャンセルできません。\nスタッフにお声がけください。");
+          return;
+        }
+        await m.remove(m.ref(db,"orders/"+key));
+        // キャッシュからも削除
+        if(window._orderCache) delete window._orderCache[key];
+        if(window._myOrderKeys){
+          window._myOrderKeys = window._myOrderKeys.filter(function(k){ return k!==key; });
+          sessionStorage.setItem("myOrderKeys", JSON.stringify(window._myOrderKeys));
+        }
+        if(window._renderHistoryFromFirebase) window._renderHistoryFromFirebase();
+        alert("注文をキャンセルしました。");
+      }catch(e){
+        alert("キャンセルに失敗しました。");
+      }
+    };
+
+    watchMyOrders();
+
+    // 最新の注文キーを監視に追加
+    window._startWatchingLatestOrder = function(){
+      var keys = JSON.parse(sessionStorage.getItem("myOrderKeys")||"[]");
+      var latest = keys[keys.length-1];
+      if(!latest) return;
+      window._orderCache = window._orderCache || {};
+      m.onValue(m.ref(db,"orders/"+latest), function(snap){
+        if(snap.val()){
+          window._orderCache[latest] = snap.val();
+          window._orderCache[latest]._key = latest;
+        } else {
+          delete window._orderCache[latest];
+        }
+        if(window._renderHistoryFromFirebase) window._renderHistoryFromFirebase();
+      });
     };
 
     // 店員呼び出しをFirebaseに送信
