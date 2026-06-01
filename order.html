@@ -588,9 +588,11 @@ if(firebaseConfig.apiKey){
   Promise.all([
     import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"),
     import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js")
-  ]).then(function(m){
-    var app=m[0].initializeApp(firebaseConfig);
-    var db=m[1].getDatabase(app);
+  ]).then(function(modules){
+    var initializeApp=modules[0].initializeApp;
+    var m=modules[1];
+    var app=initializeApp(firebaseConfig);
+    var db=m.getDatabase(app);
 
     // URLからsession_idとtableを取得
     var params = new URLSearchParams(location.search);
@@ -598,7 +600,7 @@ if(firebaseConfig.apiKey){
     var urlSession = params.get("sid") || "";
 
     // セッション状態をリアルタイム監視
-    m[1].onValue(m[1].ref(db, "sessions/table_"+urlTable), function(snap){
+    m.onValue(m.ref(db, "sessions/table_"+urlTable), function(snap){
       var session = snap.val();
       var menuEl = document.getElementById("menu-list");
       var cartBar = document.getElementById("cart-bar");
@@ -633,7 +635,7 @@ if(firebaseConfig.apiKey){
       btn.textContent="送信中...";btn.disabled=true;
       try{
         // セッション確認
-        var sessionSnap = await m[1].get(m[1].ref(db,"sessions/table_"+table));
+        var sessionSnap = await m.get(m.ref(db,"sessions/table_"+table));
         var session = sessionSnap.val();
         if(!session || !session.active){
           alert("現在この席は利用できません。スタッフをお呼びください。");
@@ -645,10 +647,10 @@ if(firebaseConfig.apiKey){
           btn.textContent="注文を確定する";btn.disabled=false;
           return;
         }
-        await m[1].push(m[1].ref(db,"orders"),{
+        await m.push(m.ref(db,"orders"),{
           table, items, total, status:"new",
           session_id: session.session_id,
-          createdAt: m[1].serverTimestamp()
+          createdAt: m.serverTimestamp()
         });
         showConfirm(items,total);
       }catch(err){
@@ -661,9 +663,9 @@ if(firebaseConfig.apiKey){
     window._sendCallSignal = async function(){
       var table = new URLSearchParams(location.search).get("table") || "?";
       try{
-        await m[1].push(m[1].ref(db,"calls"),{
+        await m.push(m.ref(db,"calls"),{
           table: table,
-          createdAt: m[1].serverTimestamp()
+          createdAt: m.serverTimestamp()
         });
       }catch(e){ console.error(e); }
     };

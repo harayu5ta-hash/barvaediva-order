@@ -476,7 +476,7 @@ if (firebaseConfig.apiKey) {
     };
 
     // セッション状態をリアルタイム監視してUI更新
-    m[1].onValue(m[1].ref(db,"sessions"), function(snap){
+    m.onValue(m.ref(db,"sessions"), function(snap){
       var sessions = snap.val() || {};
       ["1","2","3","counter1","counter2","counter3"].forEach(function(t){
         var s = sessions["table_"+t] || {};
@@ -505,10 +505,10 @@ if (firebaseConfig.apiKey) {
     window.startSeat = async function(table) {
       var sid = Date.now().toString(36) + Math.random().toString(36).slice(2,7);
       try {
-        await m[1].set(m[1].ref(db,"sessions/table_"+table), {
+        await m.set(m.ref(db,"sessions/table_"+table), {
           session_id: sid,
           active: true,
-          started_at: m[1].serverTimestamp()
+          started_at: m.serverTimestamp()
         });
         showToast("Table "+table+" 利用開始しました");
       } catch(e){ alert("エラー: "+e); }
@@ -518,9 +518,9 @@ if (firebaseConfig.apiKey) {
     window.endSeat = async function(table) {
       if(!confirm("Table "+table+" の利用を終了しますか？\n注文できなくなります。")) return;
       try {
-        await m[1].update(m[1].ref(db,"sessions/table_"+table), {
+        await m.update(m.ref(db,"sessions/table_"+table), {
           active: false,
-          ended_at: m[1].serverTimestamp()
+          ended_at: m.serverTimestamp()
         });
         showToast("Table "+table+" 利用終了しました");
       } catch(e){ alert("エラー: "+e); }
