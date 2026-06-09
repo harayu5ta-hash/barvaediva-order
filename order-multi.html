@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Order</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400&family=Playfair+Display:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/*
+ * ============================================================
+ * order-multi.html — マルチテナント注文システム（お客様用）
+ * ============================================================
+ * URL例: order-multi.html?shop=bar-seta&table=1&sid=xxxxxxxx
+ *
+ * Firestore データ構造
+ * ─────────────────────────────────────────────────────────────
+ * shops/{shopId}: {
+ *   name: "店舗名",
+ *   tagline: "サブタイトル（任意）",
+ *   mainColor: "#333333",
+ *   accentColor: "#8b2020",
+ *   bgColor: "#f5f0e8",
+ *   tables: ["1","2","3","counter1"],
+ *   menu: [
+ *     {
+ *       category: "カテゴリ名",
+ *       items: [
+ *         { id: "b1", name: "商品名", price: 500, desc: "説明（任意）" }
+ *       ]
+ *     }
+ *   ]
+ * }
+ *
+ * sessions/{shopId}_{tableId}: {
+ *   active: true/false,
+ *   session_id: "xxx",
+ *   started_at: Timestamp,
+ *   ended_at: Timestamp
+ * }
+ *
+ * orders/{orderId}: {
+ *   shopId: "bar-seta",
+ *   table: "1",
+ *   items: [{name, price, qty}],
+ *   total: 1500,
+ *   status: "new"|"working"|"done",
+ *   session_id: "xxx",
+ *   createdAt: Timestamp,
+ *   deleteAt: Timestamp  ← FirestoreのTTLポリシーで2日後に自動削除
+ * }
+ *
+ * calls/{callId}: {
+ *   shopId: "bar-seta",
+ *   table: "1",
+ *   createdAt: Timestamp
+ * }
+ *
+ * ─────────────────────────────────────────────────────────────
+ * Firestore TTL設定手順（GCPコンソール）
+ * ─────────────────────────────────────────────────────────────
+ * 1. GCP Console → Firestore → データベースを選択
+ * 2. 左メニュー「TTL」をクリック
+ * 3. 「TTLポリシーを追加」→ コレクション: orders, フィールド: deleteAt
+ * 4. 保存（反映まで最大24時間）
+ * ※ deleteAt フィールドはTimestampで保存されている必要があります
+ *
+ * ─────────────────────────────────────────────────────────────
+ * サンプルショップデータ（Firestoreに追加）
+ * ─────────────────────────────────────────────────────────────
+ * shops/bar-seta: {
+ *   name: "Bar Seta", tagline: "Cocktails & Wine",
+ *   mainColor: "#1a2e4a", accentColor: "#c77a2f",
+ *   bgColor: "#f2ede5", tables: ["1","2","3","4","bar1","bar2"],
+ *   menu: [
+ *     { category: "ドリンク", items: [
+ *       { id:"b1", name:"生ビール", price:600, desc:"サッポロ" },
+ *       { id:"b2", name:"ハイボール", price:650 },
+ *       { id:"b3", name:"赤ワイン", price:800, desc:"グラス" },
+ *       { id:"b4", name:"白ワイン", price:800, desc:"グラス" },
+ *       { id:"b5", name:"ノンアルコール", price:500 }
+ *     ]},
+ *     { category: "フード", items: [
+ *       { id:"f1", name:"枝豆", price:380 },
+ *       { id:"f2", name:"ポテトフライ", price:480 },
+ *       { id:"f3", name:"唐揚げ", price:680 },
+ *       { id:"f4", name:"チーズプレート", price:780 }
+ *     ]}
+ *   ]
+ * }
+ *
+ * shops/cafe-verde: {
+ *   name: "Café Verde", tagline: "Coffee & Food",
+ *   mainColor: "#2d4a3e", accentColor: "#52b788",
+ *   bgColor: "#f0f7f2", tables: ["A1","A2","A3","B1","B2","テラス1"],
+ *   menu: [
+ *     { category: "コーヒー", items: [
+ *       { id:"c1", name:"ブレンドコーヒー", price:480 },
+ *       { id:"c2", name:"カフェラテ", price:550 },
+ *       { id:"c3", name:"アイスコーヒー", price:520 },
+ *       { id:"c4", name:"エスプレッソ", price:380 }
+ *     ]},
+ *     { category: "ティー", items: [
+ *       { id:"t1", name:"紅茶", price:480 },
+ *       { id:"t2", name:"抹茶ラテ", price:580 }
+ *     ]},
+ *     { category: "フード", items: [
+ *       { id:"f1", name:"モーニングセット", price:750, desc:"トースト・サラダ・ドリンク" },
+ *       { id:"f2", name:"サンドイッチ", price:680 },
+ *       { id:"f3", name:"ケーキセット", price:850, desc:"本日のケーキ+ドリンク" }
+ *     ]}
+ *   ]
+ * }
+ *
+ * ─────────────────────────────────────────────────────────────
+ * 店舗追加方法
+ * ─────────────────────────────────────────────────────────────
+ * 1. Firestore > shops コレクション > 新しいドキュメントを追加
+ * 2. ドキュメントID = shopId（例: ramen-yamada）
+ * 3. 上記フォーマットでデータを入力
+ * 4. QRコードURL: order-multi.html?shop=ramen-yamada&table=1&sid={session_id}
+ * 5. スタッフURL: staff-multi.html?shop=ramen-yamada
+ * ============================================================
+ */
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --main:#333333;
+  --accent:#8b2020;
+  --bg:#f5f0e8;
+  --surface:#faf7f2;
+  --border:#d4c9b0;
+  --border2:#e8e0cc;
+  --muted:#9a8870;
+  --font-h:'Playfair Display',serif;
+  --font-b:'Noto Sans JP',sans-serif;
+}
+body{background:var(--bg);color:var(--main);font-family:var(--font-b);font-weight:300;min-height:100vh;padding-bottom:160px}
+
+/* LOADING */
+#loading{display:flex;align-items:center;justify-content:center;min-height:100vh;font-size:13px;color:var(--muted);letter-spacing:.15em;flex-direction:column;gap:12px}
+.loading-dot{width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block;animation:ldot 1.2s ease-in-out infinite}
+.loading-dot:nth-child(2){animation-delay:.2s}.loading-dot:nth-child(3){animation-delay:.4s}
+@keyframes ldot{0%,80%,100%{opacity:.3;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}
+#app{display:none}
+
+/* HEADER */
+header{text-align:center;padding:32px 24px 24px;border-bottom:2px solid var(--border);background:var(--surface)}
+.shop-name{font-family:var(--font-h);font-size:clamp(30px,7vw,46px);font-weight:400;letter-spacing:.08em;color:var(--main);line-height:1}
+.shop-rule{display:flex;align-items:center;gap:12px;justify-content:center;margin:10px 0 6px}
+.shop-rule::before,.shop-rule::after{content:'';flex:1;max-width:50px;height:1px;background:var(--border)}
+.shop-tagline{font-size:9px;letter-spacing:.25em;color:var(--muted);text-transform:uppercase}
+.table-badge{display:inline-block;margin-top:12px;padding:4px 20px;border:1px solid var(--border);font-size:11px;letter-spacing:.15em;color:var(--main);background:var(--bg)}
+
+/* TABS */
+.tab-nav{display:flex;background:var(--surface);border-bottom:1px solid var(--border)}
+.tab-btn{flex:1;padding:11px;font-size:11px;letter-spacing:.1em;color:var(--muted);background:transparent;border:none;cursor:pointer;border-bottom:2px solid transparent;transition:color .2s,border-color .2s;font-family:var(--font-b)}
+.tab-btn.active{color:var(--main);border-bottom-color:var(--accent)}
+
+/* MENU */
+#menu-view{max-width:520px;margin:0 auto;padding:0 16px}
+.cat-block{border-bottom:1px solid var(--border2);margin-top:4px}
+.cat-header{display:flex;align-items:center;justify-content:space-between;padding:16px 4px;cursor:pointer;user-select:none}
+.cat-title{font-family:var(--font-h);font-size:21px;font-weight:400;color:var(--accent);letter-spacing:.04em}
+.cat-arrow{color:var(--muted);font-size:14px;transition:transform .3s}
+.cat-arrow.open{transform:rotate(180deg)}
+.cat-items{overflow:hidden;max-height:0;transition:max-height .4s ease}
+.cat-items.open{max-height:2000px}
+.menu-item{display:flex;align-items:flex-start;justify-content:space-between;padding:13px 4px;border-bottom:1px dashed var(--border2);gap:12px}
+.menu-item:last-child{border-bottom:none;padding-bottom:16px}
+.item-info{flex:1}
+.item-name{font-family:var(--font-h);font-size:18px;font-weight:400;color:var(--main);letter-spacing:.02em;line-height:1.2}
+.item-desc{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.6;font-style:italic}
+.item-price{font-size:12px;color:var(--muted);margin-top:4px;letter-spacing:.04em}
+.item-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;padding-top:2px}
+.qty-ctrl{display:flex;align-items:center;gap:10px}
+.qty-btn{width:28px;height:28px;border-radius:50%;border:1px solid var(--border);background:var(--surface);color:var(--main);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s,border-color .2s}
+.qty-btn:hover:not(:disabled){background:var(--border2);border-color:var(--main)}
+.qty-btn:disabled{opacity:.25;cursor:default}
+.qty-num{font-size:16px;min-width:18px;text-align:center;color:var(--main)}
+.item-subtotal{font-size:11px;color:var(--accent);min-height:16px}
+
+/* CART BAR */
+#cart-bar{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:2px solid var(--border);padding:14px 20px 28px;z-index:50}
+.cart-summary{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.cart-count-label{font-size:11px;color:var(--muted);letter-spacing:.08em}
+#cart-count{font-family:var(--font-h);font-size:22px;color:var(--accent);margin:0 3px}
+#cart-items{display:block;font-size:11px;color:var(--muted);margin-top:3px;line-height:1.6;max-width:220px}
+#cart-total{font-family:var(--font-h);font-size:26px;color:var(--main)}
+#order-btn{width:100%;padding:13px;background:var(--main);color:var(--bg);border:none;font-family:var(--font-b);font-size:13px;letter-spacing:.18em;cursor:pointer;transition:opacity .2s,transform .1s;font-weight:400}
+#order-btn:hover:not(:disabled){opacity:.85}
+#order-btn:active:not(:disabled){transform:scale(.98)}
+#order-btn:disabled{opacity:.3;cursor:default}
+
+/* HISTORY */
+#history-view{max-width:520px;margin:0 auto;padding:12px 16px}
+.history-card{background:var(--surface);border:1px solid var(--border);padding:14px;margin-bottom:10px}
+.history-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding-bottom:8px;border-bottom:1px dashed var(--border2)}
+.history-time{font-size:11px;color:var(--muted)}
+.history-total{font-family:var(--font-h);font-size:18px;color:var(--accent)}
+.history-row{font-size:12px;color:var(--muted);padding:3px 0;display:flex;justify-content:space-between}
+.history-row span{color:var(--main)}
+.history-status{display:inline-block;font-size:10px;letter-spacing:.1em;padding:2px 10px;border-radius:2px;margin-top:6px}
+.hstat-new{background:rgba(176,48,48,.1);color:#b03030;border:1px solid rgba(176,48,48,.3)}
+.hstat-working{background:rgba(138,96,32,.1);color:#8a6020;border:1px solid rgba(138,96,32,.3)}
+.hstat-done{background:rgba(58,122,74,.1);color:#3a7a4a;border:1px solid rgba(58,122,74,.25)}
+.history-cancel{margin-top:8px;padding:5px 14px;border:1px solid rgba(176,48,48,.3);background:transparent;color:#b03030;font-size:11px;cursor:pointer;border-radius:2px;font-family:var(--font-b);transition:background .2s}
+.history-cancel:hover{background:rgba(176,48,48,.08)}
+.empty-state{text-align:center;padding:50px 20px;color:var(--muted);font-size:13px}
+
+/* CALL BUTTON */
+#call-btn-wrap{position:fixed;bottom:168px;right:16px;z-index:60}
+#call-btn{width:56px;height:56px;border-radius:50%;background:var(--main);color:var(--bg);border:none;font-size:22px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.18);display:flex;align-items:center;justify-content:center;transition:transform .15s;animation:cPulse 3s ease-in-out infinite}
+#call-btn:active{transform:scale(.9)}
+@keyframes cPulse{0%,100%{box-shadow:0 4px 16px rgba(0,0,0,.18)}50%{box-shadow:0 4px 24px rgba(0,0,0,.32)}}
+#call-label{font-size:9px;letter-spacing:.08em;color:var(--muted);text-align:center;margin-top:4px}
+#call-toast{position:fixed;bottom:240px;right:16px;background:var(--main);color:var(--bg);padding:8px 14px;font-size:11px;border-radius:4px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:70;white-space:nowrap}
+#call-toast.show{opacity:1}
+
+/* SESSION BLOCKED */
+#session-blocked{display:none;position:fixed;inset:0;background:rgba(245,240,232,.97);align-items:center;justify-content:center;z-index:200;flex-direction:column;gap:16px;text-align:center;padding:32px}
+.blocked-icon{font-size:48px}
+.blocked-title{font-family:var(--font-h);font-size:24px;color:var(--main)}
+.blocked-msg{font-size:13px;color:var(--muted);line-height:1.8}
+
+/* CONFIRM */
+#confirm-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);align-items:center;justify-content:center;opacity:0;transition:opacity .35s;z-index:100}
+.confirm-box{background:var(--surface);border:1px solid var(--border);padding:40px 32px;text-align:center;max-width:300px;width:90%}
+.confirm-icon{width:48px;height:48px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;margin:0 auto 16px}
+.confirm-icon svg{width:20px;height:20px;stroke:var(--accent);fill:none;stroke-width:1.5}
+.confirm-title{font-family:var(--font-h);font-size:22px;color:var(--main);margin-bottom:6px}
+.confirm-sub{font-size:12px;color:var(--muted);line-height:1.8;font-style:italic}
+#close-confirm{margin-top:22px;padding:8px 28px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:11px;letter-spacing:.12em;cursor:pointer;font-family:var(--font-b)}
+
+/* TOAST */
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--main);color:var(--bg);padding:12px 24px;border-radius:4px;font-size:13px;transition:transform .3s;z-index:300;white-space:nowrap;pointer-events:none}
+#toast.show{transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <span class="loading-dot"></span><span class="loading-dot"></span><span class="loading-dot"></span>
+</div>
+
+<div id="app">
+  <header>
+    <div id="shop-name" class="shop-name"></div>
+    <div class="shop-rule"><span id="shop-tagline" class="shop-tagline">ORDER</span></div>
+    <div class="table-badge" id="table-label">Table —</div>
+  </header>
+  <nav class="tab-nav">
+    <button class="tab-btn active" onclick="showTab('menu')">メニュー</button>
+    <button class="tab-btn" onclick="showTab('history')">注文履歴</button>
+  </nav>
+  <div id="menu-view"></div>
+  <div id="history-view" style="display:none"></div>
+</div>
+
+<div id="cart-bar" style="opacity:.4">
+  <div class="cart-summary">
+    <div>
+      <span class="cart-count-label">選択中 <span id="cart-count">0</span> 点</span>
+      <span id="cart-items" style="display:block;font-size:11px;color:var(--muted);margin-top:3px;line-height:1.6;max-width:220px"></span>
+    </div>
+    <span id="cart-total" style="font-family:var(--font-h);font-size:26px;color:var(--main)">¥0</span>
+  </div>
+  <button id="order-btn" disabled>注文を確定する</button>
+</div>
+
+<div id="call-btn-wrap">
+  <button id="call-btn" title="スタッフを呼ぶ">🔔</button>
+  <div id="call-label">店員を呼ぶ</div>
+</div>
+<div id="call-toast">スタッフを呼びました！</div>
+
+<div id="session-blocked" style="display:none">
+  <div class="blocked-icon">🔒</div>
+  <p class="blocked-title">ご注文いただけません</p>
+  <p class="blocked-msg" id="blocked-msg">この席はまだ利用開始されていません。<br>スタッフにお声がけください。</p>
+</div>
+
+<div id="confirm-overlay" style="display:none">
+  <div class="confirm-box">
+    <div class="confirm-icon"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
+    <p class="confirm-title">ご注文ありがとうございます</p>
+    <p class="confirm-sub">スタッフがご準備いたします。<br>しばらくお待ちください。</p>
+    <button id="close-confirm">閉じる</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script type="module">
+const firebaseConfig = {
+  apiKey:            "AIzaSyAFrmMUkpBXL-aBBxXjO8HBPOD2glM9jkk",
+  authDomain:        "qrclaud.firebaseapp.com",
+  projectId:         "qrclaud",
+  storageBucket:     "qrclaud.firebasestorage.app",
+  messagingSenderId: "1028256471338",
+  appId:             "1:1028256471338:web:539d7dc0e42f988a69e653"
+};
+
+const [appMod, fsMod] = await Promise.all([
+  import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"),
+  import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js")
+]);
+
+const { initializeApp } = appMod;
+const {
+  getFirestore, doc, getDoc, collection, addDoc,
+  onSnapshot, serverTimestamp, Timestamp, updateDoc, deleteDoc
+} = fsMod;
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const params = new URLSearchParams(location.search);
+const shopId   = params.get("shop")  || "";
+const tableId  = params.get("table") || "?";
+const sessionKey = params.get("sid") || "";
+
+// ─── 店舗未指定 ───
+if (!shopId) {
+  document.getElementById("loading").innerHTML =
+    '<div style="text-align:center;padding:60px 24px">' +
+    '<p style="font-size:16px;color:#666;margin-bottom:8px">URLに ?shop=店舗ID を指定してください</p>' +
+    '<p style="font-size:12px;color:#999">例: order-multi.html?shop=bar-seta&table=1</p></div>';
+  throw new Error("shopId missing");
+}
+
+// ─── 店舗データ読み込み ───
+const shopSnap = await getDoc(doc(db, "shops", shopId));
+if (!shopSnap.exists()) {
+  document.getElementById("loading").innerHTML =
+    '<div style="text-align:center;padding:60px 24px">' +
+    '<p style="font-size:16px;color:#666">店舗が見つかりません: ' + shopId + '</p>' +
+    '<p style="font-size:12px;color:#999;margin-top:8px">Firestoreの shops コレクションにデータを追加してください</p></div>';
+  throw new Error("shop not found: " + shopId);
+}
+const shop = shopSnap.data();
+
+// ─── テーマ適用 ───
+const R = document.documentElement.style;
+if (shop.mainColor)    R.setProperty("--main",    shop.mainColor);
+if (shop.accentColor)  R.setProperty("--accent",  shop.accentColor);
+if (shop.bgColor)      R.setProperty("--bg",      shop.bgColor);
+if (shop.surfaceColor) R.setProperty("--surface", shop.surfaceColor);
+if (shop.borderColor)  R.setProperty("--border",  shop.borderColor);
+
+document.title = (shop.name || shopId) + " — Menu";
+document.getElementById("shop-name").textContent    = shop.name || shopId;
+document.getElementById("shop-tagline").textContent = shop.tagline || "ORDER";
+document.getElementById("table-label").textContent  = "Table " + tableId;
+
+document.getElementById("loading").style.display = "none";
+document.getElementById("app").style.display = "block";
+
+// ─── カート状態 ───
+let cart = {};
+
+// ─── メニュー描画 ───
+const menuView = document.getElementById("menu-view");
+const cats = shop.menu || [];
+
+if (cats.length === 0) {
+  menuView.innerHTML = '<p style="text-align:center;padding:40px;color:var(--muted);font-size:13px">メニューが登録されていません</p>';
+} else {
+  menuView.innerHTML = cats.map(cat => `
+    <div class="cat-block">
+      <div class="cat-header" onclick="toggleCat(this)">
+        <span class="cat-title">${cat.category}</span>
+        <span class="cat-arrow">▾</span>
+      </div>
+      <div class="cat-items open">
+        ${(cat.items || []).map(item => `
+          <div class="menu-item" data-id="${item.id}" data-name="${escHtml(item.name)}" data-price="${item.price}">
+            <div class="item-info">
+              <p class="item-name">${escHtml(item.name)}</p>
+              ${item.desc ? `<p class="item-desc">${escHtml(item.desc)}</p>` : ""}
+              <p class="item-price">¥${item.price.toLocaleString()}</p>
+            </div>
+            <div class="item-right">
+              <div class="qty-ctrl">
+                <button class="qty-btn minus" disabled>−</button>
+                <span class="qty-num">0</span>
+                <button class="qty-btn plus">+</button>
+              </div>
+              <span class="item-subtotal"></span>
+            </div>
+          </div>`).join("")}
+      </div>
+    </div>`).join("");
+}
+
+function escHtml(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+window.toggleCat = function(header) {
+  const items = header.nextElementSibling;
+  const arrow = header.querySelector(".cat-arrow");
+  const isOpen = items.classList.contains("open");
+  items.classList.toggle("open", !isOpen);
+  arrow.classList.toggle("open", !isOpen);
+};
+
+// ─── カート更新 ───
+function updateCart() {
+  let total = 0, count = 0;
+  const lines = [];
+  document.querySelectorAll(".menu-item").forEach(el => {
+    const id = el.dataset.id, q = cart[id] || 0;
+    const price = parseInt(el.dataset.price), name = el.dataset.name;
+    el.querySelector(".qty-num").textContent = q;
+    el.querySelector(".qty-btn.minus").disabled = q === 0;
+    el.querySelector(".item-subtotal").textContent = q > 0 ? "¥" + (price * q).toLocaleString() : "";
+    if (q > 0) { lines.push(name + " ×" + q); total += price * q; count += q; }
+  });
+  document.getElementById("cart-count").textContent = count;
+  document.getElementById("cart-total").textContent = "¥" + total.toLocaleString();
+  document.getElementById("cart-items").textContent = lines.join(" / ");
+  document.getElementById("order-btn").disabled = count === 0;
+  document.getElementById("cart-bar").style.opacity = count > 0 ? "1" : "0.4";
+}
+
+document.addEventListener("click", e => {
+  const btn = e.target.closest(".qty-btn");
+  if (!btn) return;
+  const item = btn.closest(".menu-item");
+  if (!item) return;
+  const id = item.dataset.id;
+  if (btn.classList.contains("plus"))       cart[id] = (cart[id] || 0) + 1;
+  else if ((cart[id] || 0) > 0)             cart[id]--;
+  updateCart();
+});
+
+// ─── セッション監視 ───
+const sessionDocId = `${shopId}_${tableId}`;
+const sessionRef   = doc(db, "sessions", sessionDocId);
+
+onSnapshot(sessionRef, snap => {
+  const session = snap.data();
+  const menuEl  = document.getElementById("menu-view");
+  const cartBar = document.getElementById("cart-bar");
+  const blocked = document.getElementById("session-blocked");
+
+  if (!session || !session.active) {
+    menuEl.style.opacity = "0.3";
+    cartBar.style.display = "none";
+    blocked.style.display = "flex";
+    document.getElementById("blocked-msg").textContent = "この席はまだ利用開始されていません。\nスタッフにお声がけください。";
+  } else if (sessionKey && session.session_id !== sessionKey) {
+    menuEl.style.opacity = "0.3";
+    cartBar.style.display = "none";
+    blocked.style.display = "flex";
+    document.getElementById("blocked-msg").textContent = "このQRコードは無効です。スタッフにお声がけください。";
+  } else {
+    menuEl.style.opacity = "1";
+    cartBar.style.display = "block";
+    blocked.style.display = "none";
+  }
+});
+
+// ─── 注文送信 ───
+document.getElementById("order-btn").addEventListener("click", async () => {
+  const items = [];
+  document.querySelectorAll(".menu-item").forEach(el => {
+    const q = cart[el.dataset.id] || 0;
+    if (q > 0) items.push({ name: el.dataset.name, price: parseInt(el.dataset.price), qty: q });
+  });
+  const total = items.reduce((s, i) => s + i.price * i.qty, 0);
+
+  const btn = document.getElementById("order-btn");
+  btn.textContent = "送信中..."; btn.disabled = true;
+
+  try {
+    const sessionSnap = await getDoc(sessionRef);
+    const session = sessionSnap.data();
+    if (!session || !session.active) {
+      alert("現在この席は利用できません。スタッフをお呼びください。");
+      btn.textContent = "注文を確定する"; btn.disabled = false; return;
+    }
+    if (sessionKey && session.session_id !== sessionKey) {
+      alert("このQRコードは無効です。スタッフにお声がけください。");
+      btn.textContent = "注文を確定する"; btn.disabled = false; return;
+    }
+
+    // TTL: 2日後（FirestoreのTTLポリシーで自動削除）
+    const deleteAt = Timestamp.fromMillis(Date.now() + 2 * 24 * 60 * 60 * 1000);
+
+    const ref = await addDoc(collection(db, "orders"), {
+      shopId,
+      table:      tableId,
+      items,
+      total,
+      status:     "new",
+      session_id: session.session_id,
+      createdAt:  serverTimestamp(),
+      deleteAt               // ← Firestore TTL フィールド（2日後）
+    });
+
+    // 自分の注文キーを保存
+    const storageKey = `myOrderKeys_${shopId}_${tableId}`;
+    const myKeys = JSON.parse(sessionStorage.getItem(storageKey) || "[]");
+    myKeys.push(ref.id);
+    sessionStorage.setItem(storageKey, JSON.stringify(myKeys));
+    window._myOrderKeys = myKeys;
+
+    cart = {}; updateCart();
+    showConfirm();
+    watchMyOrders();
+  } catch (err) {
+    alert("送信に失敗しました。");
+    btn.textContent = "注文を確定する"; btn.disabled = false;
+  }
+});
+
+// ─── 確認オーバーレイ ───
+function showConfirm() {
+  const ov = document.getElementById("confirm-overlay");
+  ov.style.display = "flex";
+  setTimeout(() => { ov.style.opacity = "1"; }, 10);
+}
+
+document.getElementById("close-confirm").addEventListener("click", () => {
+  const ov = document.getElementById("confirm-overlay");
+  ov.style.opacity = "0";
+  setTimeout(() => { ov.style.display = "none"; }, 350);
+  document.getElementById("order-btn").textContent = "注文を確定する";
+});
+
+// ─── 注文履歴 ───
+const storageKey = `myOrderKeys_${shopId}_${tableId}`;
+window._myOrderKeys = JSON.parse(sessionStorage.getItem(storageKey) || "[]");
+let orderCache = {};
+const sLabel = { new: "受付中", working: "準備中", done: "提供済み" };
+const sCls   = { new: "hstat-new", working: "hstat-working", done: "hstat-done" };
+
+function renderHistory() {
+  const el = document.getElementById("history-view");
+  const orders = Object.values(orderCache).sort((a, b) =>
+    (b._createdMs || 0) - (a._createdMs || 0));
+  if (!orders.length) {
+    el.innerHTML = '<div class="empty-state">まだ注文履歴がありません</div>';
+    return;
+  }
+  el.innerHTML = orders.map(o => {
+    const t = o.createdAt?.toDate ? o.createdAt.toDate() : new Date();
+    const tStr = t.getHours() + ":" + String(t.getMinutes()).padStart(2, "0");
+    return `<div class="history-card">
+      <div class="history-head">
+        <span class="history-time">${tStr}</span>
+        <span class="history-total">¥${o.total.toLocaleString()}</span>
+      </div>
+      ${o.items.map(i => `<div class="history-row"><span>${escHtml(i.name)} ×${i.qty}</span><span>¥${(i.price*i.qty).toLocaleString()}</span></div>`).join("")}
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px">
+        <span class="history-status ${sCls[o.status] || 'hstat-new'}">${sLabel[o.status] || o.status}</span>
+        ${o.status === "new" ? `<button class="history-cancel" onclick="cancelOrder('${o._key}')">キャンセル</button>` : ""}
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function watchMyOrders() {
+  (window._myOrderKeys || []).forEach(key => {
+    if (orderCache[key] !== undefined) return; // already watching
+    orderCache[key] = null; // mark as watching
+    onSnapshot(doc(db, "orders", key), snap => {
+      if (snap.exists()) {
+        orderCache[key] = { ...snap.data(), _key: key };
+        const ts = snap.data().createdAt;
+        orderCache[key]._createdMs = ts?.toMillis ? ts.toMillis() : 0;
+      } else {
+        delete orderCache[key];
+      }
+      renderHistory();
+    });
+  });
+}
+
+window.cancelOrder = async key => {
+  if (!confirm("この注文をキャンセルしますか？")) return;
+  try {
+    const snap = await getDoc(doc(db, "orders", key));
+    if (!snap.exists()) { alert("注文が見つかりません。"); return; }
+    if (snap.data().status !== "new") {
+      alert("すでに準備が始まっているためキャンセルできません。\nスタッフにお声がけください。"); return;
+    }
+    await deleteDoc(doc(db, "orders", key));
+    delete orderCache[key];
+    window._myOrderKeys = (window._myOrderKeys || []).filter(k => k !== key);
+    sessionStorage.setItem(storageKey, JSON.stringify(window._myOrderKeys));
+    renderHistory();
+  } catch (e) { alert("キャンセルに失敗しました。"); }
+};
+
+watchMyOrders();
+
+// ─── タブ切り替え ───
+window.showTab = tab => {
+  document.querySelectorAll(".tab-btn").forEach((b, i) =>
+    b.classList.toggle("active", (i === 0 && tab === "menu") || (i === 1 && tab === "history")));
+  document.getElementById("menu-view").style.display    = tab === "menu"    ? "block" : "none";
+  document.getElementById("history-view").style.display = tab === "history" ? "block" : "none";
+  if (tab === "history") renderHistory();
+};
+
+// ─── スタッフ呼び出し ───
+document.getElementById("call-btn").addEventListener("click", async () => {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [0, 0.2, 0.4, 0.6].forEach((t, i) => {
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = [523, 659, 784, 1047][i];
+      osc.type = "sine";
+      gain.gain.setValueAtTime(0, ctx.currentTime + t);
+      gain.gain.linearRampToValueAtTime(0.4, ctx.currentTime + t + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.6);
+      osc.start(ctx.currentTime + t); osc.stop(ctx.currentTime + t + 0.6);
+    });
+  } catch(e) {}
+  const toast = document.getElementById("call-toast");
+  toast.classList.add("show");
+  setTimeout(() => toast.classList.remove("show"), 2500);
+  try {
+    await addDoc(collection(db, "calls"), {
+      shopId, table: tableId, createdAt: serverTimestamp()
+    });
+  } catch(e) { console.error(e); }
+});
+
+// ─── トースト ───
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 3000);
+}
+
+updateCart();
+</script>
+</body>
+</html>
