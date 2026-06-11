@@ -123,6 +123,10 @@ input[type=range]{flex:1;accent-color:var(--accent);height:4px}
 .act-reset{color:var(--muted);border-color:var(--border);font-size:10px;padding:5px 12px}
 .act-reset:hover{background:var(--border2);color:var(--red)}
 .empty{text-align:center;padding:50px 20px;color:var(--muted);font-size:13px;border:1px dashed var(--border);border-radius:2px}
+.elapsed-badge{font-size:10px;padding:2px 8px;border-radius:2px;font-weight:400;letter-spacing:.05em}
+.elapsed-ok{background:rgba(58,122,74,.1);color:var(--green);border:1px solid rgba(58,122,74,.25)}
+.elapsed-warn{background:rgba(138,96,32,.1);color:var(--amber);border:1px solid rgba(138,96,32,.3)}
+.elapsed-late{background:rgba(176,48,48,.1);color:var(--red);border:1px solid rgba(176,48,48,.3);animation:pulse 1.5s ease infinite}
 
 /* 席管理 */
 #seat-panel{padding:12px 16px;max-width:600px;margin:0 auto;display:none;gap:10px;flex-direction:column}
@@ -493,7 +497,7 @@ function render() {
           </div>
           <div class="card-right">
             <span class="time-ago">${timeAgo(ms)}</span>
-            ${isRemind ? `<span class="remind-label">⚠ ${elapsedMin(ms)}分経過</span>` : ""}
+            <span class="elapsed-badge ${elapsedMin(ms)>=remindMin?'elapsed-late':elapsedMin(ms)>=5?'elapsed-warn':'elapsed-ok'}">⏱ ${elapsedMin(ms)}分</span>
             <span class="total-price">¥${(o.total||0).toLocaleString()}</span>
           </div>
         </div>
@@ -742,7 +746,7 @@ async function loadArchive() {
   } catch(e) { el.innerHTML = '<div class="empty">読み込みに失敗しました</div>'; }
 }
 
-setInterval(() => { render(); checkRemind(); }, 30000);
+setInterval(() => { render(); checkRemind(); }, 60000);
 </script>
 </body>
 </html>
