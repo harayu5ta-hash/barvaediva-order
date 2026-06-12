@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Staff</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+/*
+ * staff-izakaya.html — デモ用スタッフページ（居酒屋）
+ * URL: staff-izakaya.html?shop=izakaya-demo
+ * 品目別完了管理 + completedItems[] でFirestore管理
+ */
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f1e30;
+  --surface:#162840;
+  --surface2:#1d3550;
+  --border:#2a4a6a;
+  --text:#e8f4fd;
+  --muted:#6a9ec5;
+  --accent:#3a9fd8;
+  --green:#2ecc71;
+  --amber:#f39c12;
+  --red:#e74c3c;
+  --done-bg:#0d2a1a;
+}
+body{background:var(--bg);color:var(--text);font-family:'Noto Sans JP',sans-serif;min-height:100vh}
+
+/* LOADING */
+#loading{display:flex;align-items:center;justify-content:center;min-height:100vh;font-size:13px;color:var(--muted);letter-spacing:.2em}
+#app{display:none}
+
+/* HEADER */
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 20px;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.h-logo{font-size:20px;font-weight:900;letter-spacing:.06em;color:var(--text);display:flex;align-items:center;gap:10px}
+#new-badge{display:none;background:var(--red);color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;animation:pulse 1.5s ease infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.h-meta{font-size:11px;color:var(--muted);letter-spacing:.1em}
+
+/* SUMMARY */
+#summary{background:var(--surface2);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;gap:20px;align-items:center}
+.sum-chip{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.sum-val{font-size:22px;font-weight:900;color:var(--text)}
+.sum-sep{flex:1}
+#reset-btn{padding:6px 16px;border:1px solid rgba(231,76,60,.4);background:transparent;color:var(--red);font-size:11px;font-weight:700;letter-spacing:.08em;cursor:pointer;border-radius:4px;transition:background .2s}
+#reset-btn:hover{background:rgba(231,76,60,.1)}
+
+/* TABS */
+.tabs{display:flex;background:var(--surface);border-bottom:1px solid var(--border)}
+.tab{flex:1;padding:12px;font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--muted);background:transparent;border:none;border-bottom:2px solid transparent;cursor:pointer;transition:color .2s,border-color .2s}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+/* FILTER */
+.filter-row{display:flex;gap:8px;padding:10px 16px;overflow-x:auto;scrollbar-width:none;background:var(--bg);border-bottom:1px solid var(--border)}
+.filter-row::-webkit-scrollbar{display:none}
+.f-btn{flex-shrink:0;padding:5px 14px;border-radius:20px;border:1px solid var(--border);background:transparent;font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--muted);cursor:pointer;transition:all .2s}
+.f-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+
+/* ORDERS */
+#orders-wrap{padding:12px 16px;max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+
+/* ORDER CARD */
+.ocard{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;transition:opacity .3s}
+.ocard.is-done{opacity:.45;filter:grayscale(.3)}
+.ocard.remind{border-color:var(--amber);box-shadow:0 0 0 1px rgba(243,156,18,.3)}
+.ocard-head{display:flex;align-items:center;padding:12px 16px;gap:10px;border-bottom:1px solid var(--border)}
+.ocard-table{font-size:24px;font-weight:900;color:var(--accent);min-width:80px}
+.ocard-status{padding:4px 10px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:.1em}
+.st-new{background:rgba(231,76,60,.15);color:var(--red);border:1px solid rgba(231,76,60,.3)}
+.st-working{background:rgba(243,156,18,.15);color:var(--amber);border:1px solid rgba(243,156,18,.3)}
+.st-done{background:rgba(46,204,113,.15);color:var(--green);border:1px solid rgba(46,204,113,.3)}
+.ocard-meta{margin-left:auto;text-align:right}
+.ocard-time{font-size:11px;color:var(--muted)}
+.ocard-elapsed{font-size:12px;font-weight:700;margin-top:2px}
+.el-ok{color:var(--green)}
+.el-warn{color:var(--amber)}
+.el-late{color:var(--red);animation:pulse 1.5s ease infinite}
+.ocard-total{font-size:18px;font-weight:900;color:var(--text)}
+
+/* ITEMS */
+.ocard-items{padding:8px 16px}
+.item-row{display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);gap:10px}
+.item-row:last-child{border:none}
+.item-check{width:24px;height:24px;border-radius:50%;border:2px solid var(--border);background:transparent;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;font-size:14px}
+.item-check.done{background:var(--green);border-color:var(--green);color:#fff}
+.item-check:hover{border-color:var(--accent)}
+.item-name{flex:1;font-size:13px;font-weight:700;color:var(--text)}
+.item-name.done{text-decoration:line-through;opacity:.5}
+.item-qty{font-size:11px;color:var(--muted);min-width:28px;text-align:right}
+.item-price{font-size:12px;color:var(--muted);min-width:60px;text-align:right}
+
+/* ACTIONS */
+.ocard-actions{padding:10px 16px 14px;display:flex;gap:8px;flex-wrap:wrap;border-top:1px solid var(--border)}
+.act{padding:8px 18px;border-radius:20px;border:1px solid;background:transparent;font-size:11px;font-weight:700;letter-spacing:.08em;cursor:pointer;transition:background .2s}
+.act-working{color:var(--amber);border-color:rgba(243,156,18,.4)}
+.act-working:hover{background:rgba(243,156,18,.1)}
+.act-done{color:var(--green);border-color:rgba(46,204,113,.4)}
+.act-done:hover{background:rgba(46,204,113,.1)}
+.act-cancel{color:var(--red);border-color:rgba(231,76,60,.3);font-size:10px;padding:6px 14px;margin-left:auto}
+.act-cancel:hover{background:rgba(231,76,60,.1)}
+
+/* SEAT PANEL */
+#seat-panel{padding:12px 16px;max-width:640px;margin:0 auto;display:none;gap:10px;flex-direction:column}
+#seat-panel.active{display:flex}
+.seat-row{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.seat-name{font-size:20px;font-weight:900;color:var(--text)}
+.seat-stat{font-size:10px;font-weight:700;letter-spacing:.1em;padding:3px 12px;border-radius:20px}
+.seat-on{background:rgba(46,204,113,.15);color:var(--green);border:1px solid rgba(46,204,113,.3)}
+.seat-off{background:rgba(255,255,255,.05);color:var(--muted);border:1px solid var(--border)}
+.seat-actions{display:flex;gap:8px}
+.seat-start-btn{padding:7px 18px;border:1px solid rgba(46,204,113,.4);background:transparent;color:var(--green);font-size:11px;font-weight:700;cursor:pointer;border-radius:20px;transition:background .2s}
+.seat-start-btn:hover{background:rgba(46,204,113,.1)}
+.seat-end-btn{padding:7px 18px;border:1px solid rgba(231,76,60,.4);background:transparent;color:var(--red);font-size:11px;font-weight:700;cursor:pointer;border-radius:20px;transition:background .2s}
+.seat-end-btn:hover{background:rgba(231,76,60,.1)}
+
+/* HISTORY */
+#history-wrap{padding:12px 16px;max-width:640px;margin:0 auto;display:none}
+.empty{text-align:center;padding:60px;color:var(--muted);font-size:13px;border:1px dashed var(--border);border-radius:8px}
+
+/* RESET OVERLAY */
+#reset-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);align-items:center;justify-content:center;z-index:200}
+.reset-box{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:32px 28px;text-align:center;max-width:300px;width:90%}
+.reset-title{font-size:22px;font-weight:900;color:var(--red);margin-bottom:8px}
+.reset-sub{font-size:12px;color:var(--muted);line-height:1.8;margin-bottom:22px}
+.reset-btns{display:flex;gap:10px;justify-content:center}
+.rbtn-cancel{padding:10px 24px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:12px;cursor:pointer;border-radius:20px}
+.rbtn-ok{padding:10px 24px;border:1px solid rgba(231,76,60,.5);background:transparent;color:var(--red);font-size:12px;cursor:pointer;border-radius:20px}
+.rbtn-ok:hover{background:rgba(231,76,60,.1)}
+
+/* SETTINGS */
+#settings-panel{background:var(--surface2);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+.sett{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.toggle{position:relative;display:inline-block;width:36px;height:20px}
+.toggle input{opacity:0;width:0;height:0}
+.tslider{position:absolute;cursor:pointer;inset:0;background:var(--border);border-radius:20px;transition:.3s}
+.tslider:before{position:absolute;content:"";height:14px;width:14px;left:3px;bottom:3px;background:white;border-radius:50%;transition:.3s}
+.toggle input:checked+.tslider{background:var(--accent)}
+.toggle input:checked+.tslider:before{transform:translateX(16px)}
+.remind-sett{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+input[type=range]{accent-color:var(--accent);width:80px}
+#rval{font-weight:700;color:var(--accent)}
+
+/* TOAST */
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--accent);color:#fff;padding:12px 24px;border-radius:20px;font-size:13px;font-weight:700;transition:transform .3s;z-index:300;white-space:nowrap;pointer-events:none}
+#toast.show{transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div id="loading">LOADING...</div>
+<div id="app">
+  <header>
+    <div class="h-logo">
+      <span id="shop-name">—</span>
+      <span id="new-badge"></span>
+    </div>
+    <div class="h-meta">STAFF PANEL</div>
+  </header>
+
+  <div id="settings-panel">
+    <div class="sett">
+      <label class="toggle"><input type="checkbox" id="tog-sound" checked><span class="tslider"></span></label>
+      🔔 通知音
+    </div>
+    <div class="sett">
+      <label class="toggle"><input type="checkbox" id="tog-remind" checked><span class="tslider"></span></label>
+      ⏰ リマインド
+    </div>
+    <div class="remind-sett">
+      <input type="range" id="remind-range" min="3" max="30" value="10">
+      <span id="rval">10</span>分
+    </div>
+  </div>
+
+  <div id="summary">
+    <div class="sum-chip">新着 <span class="sum-val" id="s-new">0</span></div>
+    <div class="sum-chip">準備中 <span class="sum-val" id="s-work">0</span></div>
+    <div class="sum-chip">完了 <span class="sum-val" id="s-done">0</span></div>
+    <div class="sum-sep"></div>
+    <button id="reset-btn" onclick="showReset()">営業終了リセット</button>
+  </div>
+
+  <nav class="tabs">
+    <button class="tab active" onclick="switchTab('active')">対応中</button>
+    <button class="tab" onclick="switchTab('history')">本日の完了</button>
+    <button class="tab" onclick="switchTab('seats')">席管理</button>
+    <button class="tab" onclick="switchTab('archive')">過去の記録</button>
+  </nav>
+
+  <div class="filter-row" id="filter-row">
+    <button class="f-btn active" onclick="setFilter('all',this)">すべて</button>
+    <button class="f-btn" onclick="setFilter('new',this)">新着</button>
+    <button class="f-btn" onclick="setFilter('working',this)">準備中</button>
+  </div>
+
+  <div id="orders-wrap"></div>
+  <div id="history-wrap"></div>
+  <div id="seat-panel"></div>
+</div>
+
+<div id="reset-overlay">
+  <div class="reset-box">
+    <div class="reset-title">営業終了リセット</div>
+    <div class="reset-sub">完了した注文をアーカイブして<br>全データを削除します。</div>
+    <div class="reset-btns">
+      <button class="rbtn-cancel" onclick="hideReset()">キャンセル</button>
+      <button class="rbtn-ok" onclick="doReset()">リセット</button>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+document.getElementById("remind-range").addEventListener("input", function(){ document.getElementById("rval").textContent = this.value; });
+
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 3000);
+}
+function playSound() {
+  if (!document.getElementById("tog-sound").checked) return;
+  try {
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    [0,.15,.3].forEach((t,i) => {
+      const o=ctx.createOscillator(), g=ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.frequency.value=[880,1100,880][i]; o.type="sine";
+      g.gain.setValueAtTime(0,ctx.currentTime+t);
+      g.gain.linearRampToValueAtTime(.4,ctx.currentTime+t+.05);
+      g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+t+.5);
+      o.start(ctx.currentTime+t); o.stop(ctx.currentTime+t+.5);
+    });
+  } catch(e){}
+}
+function playRemind() {
+  try {
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    const o=ctx.createOscillator(), g=ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.frequency.value=440; o.type="triangle";
+    g.gain.setValueAtTime(.5,ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+1);
+    o.start(ctx.currentTime); o.stop(ctx.currentTime+1);
+  } catch(e){}
+}
+function playCall() {
+  if (!document.getElementById("tog-sound").checked) return;
+  try {
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    [0,.15,.3,.45,.6].forEach((t,i) => {
+      const o=ctx.createOscillator(), g=ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.frequency.value=[523,659,784,659,523][i]; o.type="sine";
+      g.gain.setValueAtTime(0,ctx.currentTime+t);
+      g.gain.linearRampToValueAtTime(.5,ctx.currentTime+t+.05);
+      g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+t+.55);
+      o.start(ctx.currentTime+t); o.stop(ctx.currentTime+t+.55);
+    });
+  } catch(e){}
+}
+</script>
+
+<script type="module">
+const firebaseConfig = {
+  apiKey:            "AIzaSyAFrmMUkpBXL-aBBxXjO8HBPOD2glM9jkk",
+  authDomain:        "qrclaud.firebaseapp.com",
+  projectId:         "qrclaud",
+  storageBucket:     "qrclaud.firebasestorage.app",
+  messagingSenderId: "1028256471338",
+  appId:             "1:1028256471338:web:539d7dc0e42f988a69e653"
+};
+const [appMod, fsMod] = await Promise.all([
+  import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"),
+  import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js")
+]);
+const { initializeApp } = appMod;
+const { getFirestore, doc, getDoc, getDocs, collection, addDoc, onSnapshot,
+        query, where, serverTimestamp, updateDoc, deleteDoc, setDoc } = fsMod;
+
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
+
+const shopId = new URLSearchParams(location.search).get("shop") || "";
+if (!shopId) {
+  document.getElementById("loading").innerHTML =
+    '<div style="text-align:center;color:#6a9ec5;padding:60px">URLに ?shop=店舗ID を指定してください<br><small>例: staff-izakaya.html?shop=izakaya-demo</small></div>';
+  throw new Error("shopId missing");
+}
+
+const shopSnap = await getDoc(doc(db, "shops", shopId));
+if (!shopSnap.exists()) {
+  document.getElementById("loading").innerHTML = '<div style="color:#6a9ec5;text-align:center;padding:60px">店舗が見つかりません: ' + shopId + '</div>';
+  throw new Error("shop not found");
+}
+const shop = shopSnap.data();
+document.title = (shop.name||shopId) + " — スタッフ";
+document.getElementById("shop-name").textContent = shop.name || shopId;
+document.getElementById("loading").style.display = "none";
+document.getElementById("app").style.display = "block";
+
+const tables = shop.tables || [];
+let allOrders = {}, currentFilter = "all", currentTab = "active", remindedKeys = {}, notifGranted = false;
+
+if ("Notification" in window) Notification.requestPermission().then(p => { notifGranted = p === "granted"; });
+
+// ─── 席管理パネル生成 ───
+const seatPanel = document.getElementById("seat-panel");
+seatPanel.innerHTML = tables.map(t => `
+  <div class="seat-row" id="seat-${t}">
+    <div class="seat-name">Table ${t}</div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span class="seat-stat seat-off" id="sstat-${t}">未使用 — Table ${t}</span>
+      <div class="seat-actions">
+        <button class="seat-start-btn" id="ss-${t}" onclick="startSeat('${t}')">利用開始</button>
+        <button class="seat-end-btn" id="se-${t}" onclick="endSeat('${t}')" style="display:none">終了</button>
+      </div>
+    </div>
+  </div>`).join("");
+
+tables.forEach(t => {
+  onSnapshot(doc(db, "sessions", `${shopId}_${t}`), snap => {
+    const s = snap.data() || {};
+    const stat = document.getElementById("sstat-" + t);
+    const ss   = document.getElementById("ss-" + t);
+    const se   = document.getElementById("se-" + t);
+    if (!stat) return;
+    if (s.active) {
+      stat.textContent = "利用中"; stat.className = "seat-stat seat-on";
+      if (ss) ss.style.display = "none";
+      if (se) se.style.display = "inline-block";
+    } else {
+      stat.textContent = "未使用 — Table " + t; stat.className = "seat-stat seat-off";
+      if (ss) ss.style.display = "inline-block";
+      if (se) se.style.display = "none";
+    }
+  });
+});
+
+window.startSeat = async function(t) {
+  const sid = Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+  await setDoc(doc(db, "sessions", `${shopId}_${t}`), { session_id: sid, active: true, started_at: serverTimestamp() });
+  showToast("Table " + t + " 利用開始");
+};
+window.endSeat = async function(t) {
+  if (!confirm("Table " + t + " を終了しますか？")) return;
+  await updateDoc(doc(db, "sessions", `${shopId}_${t}`), { active: false, ended_at: serverTimestamp() });
+  showToast("Table " + t + " 利用終了");
+};
+
+// ─── ユーティリティ ───
+function tsMs(ts) { return ts?.toMillis ? ts.toMillis() : (ts||0); }
+function elMin(ms) { return ms ? Math.floor((Date.now()-ms)/60000) : 0; }
+function timeAgo(ms) {
+  if (!ms) return "";
+  const d = Math.floor((Date.now()-ms)/1000);
+  if (d < 60) return d + "秒前";
+  if (d < 3600) return Math.floor(d/60) + "分前";
+  return Math.floor(d/3600) + "時間前";
+}
+function elapsedCls(min, remMin) {
+  if (min >= remMin) return "el-late";
+  if (min >= 5) return "el-warn";
+  return "el-ok";
+}
+
+// ─── フィルター ───
+window.setFilter = function(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll(".f-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  render();
+};
+window.switchTab = function(tab) {
+  currentTab = tab;
+  const tabBtns = document.querySelectorAll(".tab");
+  tabBtns.forEach((b,i) => b.classList.toggle("active",
+    (i===0&&tab==="active")||(i===1&&tab==="history")||(i===2&&tab==="seats")||(i===3&&tab==="archive")));
+  document.getElementById("orders-wrap").style.display  = (tab==="active")  ? "flex"  : "none";
+  document.getElementById("history-wrap").style.display = (tab==="history") ? "block" : "none";
+  document.getElementById("seat-panel").classList.toggle("active", tab==="seats");
+  document.getElementById("filter-row").style.display   = (tab==="active")  ? "flex"  : "none";
+  if (tab==="archive") loadArchive();
+  else render();
+};
+
+// ─── リマインド ───
+function checkRemind() {
+  if (!document.getElementById("tog-remind").checked) return;
+  const remMin = parseInt(document.getElementById("remind-range").value);
+  Object.entries(allOrders).forEach(([k,o]) => {
+    if (o.status==="done") return;
+    const ms = tsMs(o.createdAt);
+    if (elMin(ms) >= remMin && !remindedKeys[k]) {
+      remindedKeys[k] = true;
+      playRemind();
+      showToast("⚠ Table " + o.table + " — " + remMin + "分経過！");
+      if (notifGranted) new Notification((shop.name||shopId)+" リマインド", { body:"Table "+o.table+" が"+remMin+"分未提供" });
+    }
+  });
+}
+
+// ─── 品目別完了チェック ───
+window.toggleItem = async function(orderId, idx) {
+  const o = allOrders[orderId];
+  if (!o || o.status === "done") return;
+  const completed = Array.isArray(o.completedItems) ? [...o.completedItems] : [];
+  const pos = completed.indexOf(idx);
+  if (pos === -1) completed.push(idx);
+  else completed.splice(pos, 1);
+
+  const allDone = (o.items||[]).every((_,i) => completed.includes(i));
+  const update = { completedItems: completed };
+  if (allDone) update.status = "done";
+  else if (completed.length > 0) update.status = "working";
+
+  try { await updateDoc(doc(db,"orders",orderId), update); }
+  catch(e) { alert("更新失敗: " + e.message); }
+};
+
+// ─── 描画 ───
+function render() {
+  const remMin = parseInt(document.getElementById("remind-range").value);
+  const entries = Object.entries(allOrders).sort((a,b) => tsMs(b[1].createdAt) - tsMs(a[1].createdAt));
+
+  let sNew=0, sWork=0, sDone=0;
+  entries.forEach(([,o]) => { if(o.status==="new") sNew++; else if(o.status==="working") sWork++; else if(o.status==="done") sDone++; });
+  document.getElementById("s-new").textContent  = sNew;
+  document.getElementById("s-work").textContent = sWork;
+  document.getElementById("s-done").textContent = sDone;
+  const badge = document.getElementById("new-badge");
+  badge.textContent = sNew||""; badge.style.display = sNew?"inline-block":"none";
+
+  if (currentTab === "active") {
+    let active = entries.filter(([,o]) => o.status !== "done");
+    if (currentFilter !== "all") active = active.filter(([,o]) => o.status === currentFilter);
+    const wrap = document.getElementById("orders-wrap");
+    wrap.style.display = "flex";
+    if (!active.length) { wrap.innerHTML = '<div class="empty">対応中の注文はありません</div>'; return; }
+
+    wrap.innerHTML = active.map(([key,o]) => {
+      const ms = tsMs(o.createdAt);
+      const min = elMin(ms);
+      const ecls = elapsedCls(min, remMin);
+      const completed = Array.isArray(o.completedItems) ? o.completedItems : [];
+      const stCls = { new:"st-new", working:"st-working", done:"st-done" };
+      const stLbl = { new:"新着", working:"準備中", done:"完了" };
+      return `<div class="ocard${o.status==="done"?" is-done":""}${ecls==="el-late"?" remind":""}">
+        <div class="ocard-head">
+          <div class="ocard-table">Table ${o.table}</div>
+          <span class="ocard-status ${stCls[o.status]||'st-new'}">${stLbl[o.status]||o.status}</span>
+          <div class="ocard-meta">
+            <div class="ocard-time">${timeAgo(ms)}</div>
+            <div class="ocard-elapsed ${ecls}">⏱ ${min}分</div>
+            <div class="ocard-total">¥${(o.total||0).toLocaleString()}</div>
+          </div>
+        </div>
+        <div class="ocard-items">
+          ${(o.items||[]).map((item,idx) => {
+            const done = completed.includes(idx);
+            return `<div class="item-row">
+              <button class="item-check${done?" done":""}" onclick="toggleItem('${key}',${idx})">${done?"✓":""}</button>
+              <span class="item-name${done?" done":""}">${item.name}</span>
+              <span class="item-qty">×${item.qty}</span>
+              <span class="item-price">¥${(item.price*item.qty).toLocaleString()}</span>
+            </div>`;
+          }).join("")}
+        </div>
+        <div class="ocard-actions">
+          ${o.status==="new"     ? `<button class="act act-working" onclick="setStatus('${key}','working')">準備中にする</button>` : ""}
+          ${o.status==="working" ? `<button class="act act-done"    onclick="setStatus('${key}','done')">まとめて完了</button>` : ""}
+          <button class="act act-cancel" onclick="cancelOrder('${key}','${o.table}')">取消</button>
+        </div>
+      </div>`;
+    }).join("");
+
+  } else if (currentTab === "history") {
+    const wrap = document.getElementById("history-wrap");
+    wrap.style.display = "block";
+    const done = entries.filter(([,o]) => o.status==="done");
+    if (!done.length) { wrap.innerHTML = '<div class="empty">完了した注文はまだありません</div>'; return; }
+    const groups = {};
+    done.forEach(([,o]) => { const t=String(o.table); (groups[t]=groups[t]||[]).push(o); });
+    const total = done.reduce((s,[,o]) => s+(o.total||0), 0);
+    wrap.innerHTML = Object.entries(groups).map(([tname,ords]) => {
+      const tt = ords.reduce((s,o) => s+(o.total||0), 0);
+      return `<div style="margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px 8px 0 0">
+          <span style="font-size:18px;font-weight:900;color:var(--accent)">Table ${tname}</span>
+          <span style="font-size:16px;font-weight:700;color:var(--text)">¥${tt.toLocaleString()}</span>
+        </div>
+        ${ords.map(o=>`<div class="ocard is-done" style="border-radius:0;border-top:none">
+          <div class="ocard-head">
+            <span class="ocard-status st-done">完了</span>
+            <div class="ocard-meta"><div class="ocard-time">${timeAgo(tsMs(o.createdAt))}</div><div class="ocard-total">¥${(o.total||0).toLocaleString()}</div></div>
+          </div>
+          <div class="ocard-items">${(o.items||[]).map(i=>`<div class="item-row"><span class="item-name">${i.name}</span><span class="item-qty">×${i.qty}</span><span class="item-price">¥${(i.price*i.qty).toLocaleString()}</span></div>`).join("")}</div>
+        </div>`).join("")}
+      </div>`;
+    }).join("") +
+    `<div style="text-align:right;padding:12px 4px;font-size:18px;font-weight:900;color:var(--accent);border-top:1px solid var(--border)">完了合計 ¥${total.toLocaleString()}</div>`;
+  }
+}
+
+// ─── 注文操作 ───
+window.setStatus = async function(id, status) {
+  if (status==="done") {
+    remindedKeys[id] = true;
+    const o = allOrders[id];
+    const allIdx = (o?.items||[]).map((_,i)=>i);
+    await updateDoc(doc(db,"orders",id), { status, completedItems: allIdx });
+  } else {
+    await updateDoc(doc(db,"orders",id), { status });
+  }
+};
+window.cancelOrder = async function(id, table) {
+  if (!confirm("Table "+table+" の注文を取り消しますか？")) return;
+  await deleteDoc(doc(db,"orders",id));
+  showToast("Table "+table+" の注文を取り消しました");
+};
+
+// ─── Firestore監視 ───
+const ordersQ = query(collection(db,"orders"), where("shopId","==",shopId));
+const prevIds = new Set();
+onSnapshot(ordersQ, snap => {
+  allOrders = {};
+  snap.forEach(d => {
+    allOrders[d.id] = d.data();
+    if (!prevIds.has(d.id) && d.data().status==="new" && prevIds.size>0) {
+      playSound();
+      showToast("🍽 Table "+d.data().table+" から注文が入りました");
+      if (notifGranted) new Notification((shop.name||shopId)+" — 新しい注文", { body:"Table "+d.data().table+" から注文" });
+    }
+    prevIds.add(d.id);
+  });
+  [...prevIds].forEach(id => { if (!allOrders[id]) prevIds.delete(id); });
+  render(); checkRemind();
+});
+
+const callsQ = query(collection(db,"calls"), where("shopId","==",shopId));
+const knownCalls = new Set();
+onSnapshot(callsQ, snap => {
+  snap.forEach(d => {
+    if (!knownCalls.has(d.id)) {
+      knownCalls.add(d.id);
+      const c = d.data();
+      const ms = tsMs(c.createdAt);
+      if (knownCalls.size>1 || Date.now()-ms<10000) {
+        playCall();
+        showToast("🔔 Table "+c.table+" — スタッフを呼んでいます！");
+        if (notifGranted) new Notification((shop.name||shopId)+" — 呼び出し", { body:"Table "+c.table+" がスタッフを呼んでいます" });
+      }
+    }
+  });
+});
+
+// ─── リセット ───
+window.showReset = () => { document.getElementById("reset-overlay").style.display="flex"; };
+window.hideReset = () => { document.getElementById("reset-overlay").style.display="none"; };
+window.doReset = async function() {
+  try {
+    const today = new Date();
+    const dateKey = today.getFullYear()+"-"+String(today.getMonth()+1).padStart(2,"0")+"-"+String(today.getDate()).padStart(2,"0");
+    for (const [id,o] of Object.entries(allOrders)) {
+      if (o.status==="done") await addDoc(collection(db,"archive"), {...o,shopId,date:dateKey,archivedAt:serverTimestamp()});
+    }
+    for (const id of Object.keys(allOrders)) await deleteDoc(doc(db,"orders",id));
+    const cSnap = await getDocs(query(collection(db,"calls"),where("shopId","==",shopId)));
+    for (const d of cSnap.docs) await deleteDoc(d.ref);
+    document.getElementById("reset-overlay").style.display="none";
+    allOrders={}; remindedKeys={};
+    render();
+    showToast("営業終了リセット完了");
+  } catch(e) { alert("リセット失敗: "+e); }
+};
+
+// ─── アーカイブ ───
+async function loadArchive() {
+  const el = document.getElementById("history-wrap");
+  el.style.display = "block";
+  el.innerHTML = '<div class="empty">読み込み中...</div>';
+  try {
+    const snap = await getDocs(query(collection(db,"archive"),where("shopId","==",shopId)));
+    if (snap.empty) { el.innerHTML = '<div class="empty">過去の記録はありません</div>'; return; }
+    const byDate = {};
+    snap.forEach(d => { const o=d.data(); (byDate[o.date]=byDate[o.date]||[]).push(o); });
+    el.innerHTML = Object.keys(byDate).sort().reverse().map(date => {
+      const ords = byDate[date];
+      const dt = ords.reduce((s,o) => s+(o.total||0), 0);
+      return `<div style="margin-bottom:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px 8px 0 0">
+          <span style="font-size:18px;font-weight:900;color:var(--accent)">${date}</span>
+          <span style="font-weight:700">合計 ¥${dt.toLocaleString()}</span>
+        </div>
+        ${ords.map(o=>`<div class="ocard is-done" style="border-radius:0;border-top:none">
+          <div class="ocard-head"><span class="ocard-status st-done">完了</span><div class="ocard-meta"><div class="ocard-total">¥${(o.total||0).toLocaleString()}</div></div></div>
+          <div class="ocard-items">${(o.items||[]).map(i=>`<div class="item-row"><span class="item-name">${i.name}</span><span class="item-qty">×${i.qty}</span><span class="item-price">¥${(i.price*i.qty).toLocaleString()}</span></div>`).join("")}</div>
+        </div>`).join("")}
+      </div>`;
+    }).join("");
+  } catch(e) { el.innerHTML = '<div class="empty">読み込み失敗</div>'; }
+}
+
+setInterval(() => { render(); checkRemind(); }, 60000);
+</script>
+</body>
+</html>
