@@ -6,11 +6,6 @@
 <title>Order</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
-/* ============================================================
- * order-izakaya.html — マルチテナント注文システム（居酒屋デモ用）
- * URL例: order-izakaya.html?shop=izakaya-demo&table=1&sid=xxx
- * setup-izakaya-demo.html で Firestore にデータを入れてから使用
- * ============================================================ */
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
   --main:#1e3a5f;
@@ -24,12 +19,8 @@
 }
 html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto Sans JP',sans-serif}
 
-/* ── LOADING ── */
-#loading{
-  position:fixed;inset:0;background:var(--main);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
-  z-index:999;transition:opacity .4s
-}
+/* LOADING */
+#loading{position:fixed;inset:0;background:var(--main);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:999;transition:opacity .4s}
 #loading .ld-name{color:#fff;font-size:28px;font-weight:900;letter-spacing:.08em}
 #loading .ld-sub{color:rgba(255,255,255,.5);font-size:12px;letter-spacing:.2em}
 #loading .ld-dot{display:flex;gap:6px}
@@ -38,68 +29,40 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto S
 #loading .ld-dot span:nth-child(3){animation-delay:.4s}
 @keyframes blink{0%,80%,100%{opacity:.3}40%{opacity:1}}
 
-/* ── HEADER ── */
-header{
-  position:sticky;top:0;z-index:50;
-  background:var(--main);color:#fff;
-  padding:0 16px;height:56px;
-  display:flex;align-items:center;justify-content:space-between;
-  box-shadow:0 2px 8px rgba(0,0,0,.2)
-}
+/* HEADER */
+header{position:sticky;top:0;z-index:50;background:var(--main);color:#fff;padding:0 16px;height:56px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 8px rgba(0,0,0,.2)}
 .h-name{font-size:18px;font-weight:900;letter-spacing:.04em;line-height:1}
 .h-name small{display:block;font-size:9px;font-weight:400;opacity:.6;letter-spacing:.15em;margin-top:2px}
 .h-right{display:flex;align-items:center;gap:10px}
-.table-badge{
-  background:var(--accent);color:#fff;
-  font-size:11px;font-weight:700;letter-spacing:.08em;
-  padding:4px 12px;border-radius:20px;white-space:nowrap
-}
-#call-btn-h{
-  width:36px;height:36px;border-radius:50%;
-  border:1.5px solid rgba(255,255,255,.4);background:transparent;
-  color:#fff;font-size:18px;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;transition:background .2s
-}
+.table-badge{background:var(--accent);color:#fff;font-size:11px;font-weight:700;letter-spacing:.08em;padding:4px 12px;border-radius:20px;white-space:nowrap}
+#call-btn-h{width:36px;height:36px;border-radius:50%;border:1.5px solid rgba(255,255,255,.4);background:transparent;color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s}
 #call-btn-h:active{background:rgba(255,255,255,.15)}
-#call-toast{
-  position:fixed;top:64px;left:50%;transform:translateX(-50%) translateY(-10px);
-  background:var(--main);color:#fff;padding:10px 20px;border-radius:20px;
-  font-size:12px;font-weight:700;opacity:0;transition:opacity .3s,transform .3s;
-  pointer-events:none;z-index:100;white-space:nowrap
-}
+#call-toast{position:fixed;top:64px;left:50%;transform:translateX(-50%) translateY(-10px);background:var(--main);color:#fff;padding:10px 20px;border-radius:20px;font-size:12px;font-weight:700;opacity:0;transition:opacity .3s,transform .3s;pointer-events:none;z-index:100;white-space:nowrap}
 #call-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
-/* ── CATEGORY TABS ── */
-.cat-tabs{
-  position:sticky;top:56px;z-index:40;
-  background:var(--surface);border-bottom:2px solid var(--border);
-  display:flex;overflow-x:auto;scrollbar-width:none;gap:0
-}
+/* BOTTOM TABS */
+.bottom-tabs{position:fixed;bottom:0;left:0;right:0;z-index:55;background:var(--surface);border-top:2px solid var(--border);display:flex;height:56px}
+.btab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--muted);background:transparent;border:none;cursor:pointer;transition:color .2s;position:relative}
+.btab.active{color:var(--accent)}
+.btab-icon{font-size:20px;line-height:1}
+.btab-dot{position:absolute;top:8px;right:calc(50% - 18px);width:8px;height:8px;background:#e84040;border-radius:50%;display:none}
+.btab-dot.show{display:block}
+
+/* PAGES */
+.page{display:none;padding-bottom:72px}
+.page.active{display:block}
+
+/* CATEGORY TABS */
+.cat-tabs{position:sticky;top:56px;z-index:40;background:var(--surface);border-bottom:2px solid var(--border);display:flex;overflow-x:auto;scrollbar-width:none;gap:0}
 .cat-tabs::-webkit-scrollbar{display:none}
-.cat-tab{
-  flex-shrink:0;padding:12px 20px;
-  font-size:12px;font-weight:700;letter-spacing:.1em;
-  color:var(--muted);background:transparent;border:none;
-  border-bottom:3px solid transparent;margin-bottom:-2px;
-  cursor:pointer;transition:color .2s,border-color .2s;white-space:nowrap
-}
+.cat-tab{flex-shrink:0;padding:12px 20px;font-size:12px;font-weight:700;letter-spacing:.1em;color:var(--muted);background:transparent;border:none;border-bottom:3px solid transparent;margin-bottom:-2px;cursor:pointer;transition:color .2s,border-color .2s;white-space:nowrap}
 .cat-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
 
-/* ── MENU SECTIONS ── */
-#menu-view{padding:12px 12px 140px}
-.section-header{
-  font-size:11px;font-weight:700;letter-spacing:.2em;color:var(--muted);
-  padding:16px 4px 8px;text-transform:uppercase
-}
+/* MENU */
+#menu-view{padding:12px 12px 0}
+.section-header{font-size:11px;font-weight:700;letter-spacing:.2em;color:var(--muted);padding:16px 4px 8px}
 .item-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px}
-
-/* ── ITEM CARD ── */
-.item-card{
-  background:var(--surface);border:1.5px solid var(--border);
-  border-radius:10px;padding:12px 10px 10px;
-  display:flex;flex-direction:column;gap:6px;
-  position:relative;transition:border-color .15s,transform .1s
-}
+.item-card{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 10px 10px;display:flex;flex-direction:column;gap:6px;position:relative;transition:border-color .15s,transform .1s}
 .item-card.in-cart{border-color:var(--accent);background:#f0f8ff}
 .item-card:active{transform:scale(.98)}
 .item-card-name{font-size:13px;font-weight:700;line-height:1.3;color:var(--text)}
@@ -107,81 +70,57 @@ header{
 .item-card-price{font-size:17px;font-weight:900;color:var(--price);letter-spacing:.02em}
 .item-card-price small{font-size:10px;font-weight:400;margin-left:1px}
 .item-card-counter{display:flex;align-items:center;justify-content:space-between;margin-top:4px}
-.cnt-btn{
-  width:30px;height:30px;border-radius:50%;border:1.5px solid var(--border);
-  background:var(--bg);color:var(--main);font-size:16px;font-weight:700;
-  cursor:pointer;display:flex;align-items:center;justify-content:center;
-  transition:background .15s,border-color .15s;line-height:1
-}
+.cnt-btn{width:30px;height:30px;border-radius:50%;border:1.5px solid var(--border);background:var(--bg);color:var(--main);font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s,border-color .15s;line-height:1}
 .cnt-btn.plus{background:var(--main);border-color:var(--main);color:#fff}
 .cnt-btn.plus:active,.cnt-btn:active{opacity:.7}
 .cnt-num{font-size:16px;font-weight:900;color:var(--accent);min-width:24px;text-align:center}
-.cnt-badge{
-  position:absolute;top:-6px;right:-6px;
-  background:var(--accent);color:#fff;
-  width:20px;height:20px;border-radius:50%;
-  font-size:11px;font-weight:700;
-  display:none;align-items:center;justify-content:center
-}
+.cnt-badge{position:absolute;top:-6px;right:-6px;background:var(--accent);color:#fff;width:20px;height:20px;border-radius:50%;font-size:11px;font-weight:700;display:none;align-items:center;justify-content:center}
 .cnt-badge.show{display:flex}
 
-/* ── CART BAR ── */
-#cart-bar{
-  position:fixed;bottom:0;left:0;right:0;z-index:60;
-  padding:12px 16px;background:var(--main);
-  transform:translateY(100%);transition:transform .3s cubic-bezier(.4,0,.2,1)
-}
+/* CART BAR */
+#cart-bar{position:fixed;bottom:56px;left:0;right:0;z-index:54;padding:10px 16px;background:var(--main);transform:translateY(100%);transition:transform .3s cubic-bezier(.4,0,.2,1)}
 #cart-bar.visible{transform:translateY(0)}
-.cart-inner{
-  max-width:500px;margin:0 auto;
-  display:flex;align-items:center;justify-content:space-between;gap:12px
-}
+.cart-inner{max-width:500px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px}
 .cart-info{color:#fff}
 .cart-count{font-size:11px;opacity:.7;margin-bottom:1px}
 .cart-total{font-size:20px;font-weight:900;letter-spacing:.02em}
-#order-btn{
-  padding:12px 24px;border-radius:24px;
-  background:#fff;color:var(--main);
-  border:none;font-size:13px;font-weight:900;letter-spacing:.1em;
-  cursor:pointer;transition:opacity .2s;white-space:nowrap;flex-shrink:0
-}
+#order-btn{padding:12px 24px;border-radius:24px;background:#fff;color:var(--main);border:none;font-size:13px;font-weight:900;letter-spacing:.1em;cursor:pointer;transition:opacity .2s;white-space:nowrap;flex-shrink:0}
 #order-btn:disabled{opacity:.4;cursor:default}
-#order-btn:active{opacity:.8}
 
-/* ── SESSION BLOCKED ── */
-#session-blocked{
-  display:none;position:fixed;inset:0;z-index:80;
-  background:var(--main);
-  flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:32px
-}
+/* HISTORY PAGE */
+#history-view{padding:16px 12px 0}
+.hist-empty{text-align:center;padding:60px 20px;color:var(--muted);font-size:13px}
+.hist-card{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:12px}
+.hist-head{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--border)}
+.hist-time{font-size:11px;color:var(--muted)}
+.hist-total{font-size:18px;font-weight:900;color:var(--price)}
+.hist-items{padding:10px 14px}
+.hist-row{display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px dashed var(--border)}
+.hist-row:last-child{border:none}
+.hist-row span{color:var(--muted)}
+.hist-row strong{color:var(--text)}
+.hist-foot{padding:8px 14px 12px;display:flex;align-items:center;justify-content:space-between}
+.hist-badge{font-size:10px;font-weight:700;letter-spacing:.1em;padding:3px 10px;border-radius:20px}
+.hstat-new{background:rgba(232,64,64,.1);color:#e84040;border:1px solid rgba(232,64,64,.3)}
+.hstat-working{background:rgba(255,160,0,.1);color:#c07800;border:1px solid rgba(255,160,0,.3)}
+.hstat-done{background:rgba(36,113,163,.1);color:var(--accent);border:1px solid rgba(36,113,163,.3)}
+.hist-cancel{font-size:11px;font-weight:700;padding:5px 14px;border-radius:20px;border:1px solid rgba(232,64,64,.4);background:transparent;color:#e84040;cursor:pointer}
+
+/* SESSION BLOCKED */
+#session-blocked{display:none;position:fixed;inset:0;z-index:80;background:var(--main);flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:32px}
 .bl-icon{font-size:48px}
 .bl-table{font-size:36px;font-weight:900;color:#fff;letter-spacing:.05em}
 .bl-title{font-size:16px;font-weight:700;color:rgba(255,255,255,.9)}
 .bl-msg{font-size:13px;color:rgba(255,255,255,.55);line-height:1.8}
 
-/* ── CONFIRM OVERLAY ── */
-#confirm-overlay{
-  display:none;position:fixed;inset:0;z-index:90;
-  background:rgba(13,31,51,.9);
-  align-items:center;justify-content:center
-}
-.confirm-box{
-  background:var(--surface);border-radius:16px;padding:32px 28px;
-  text-align:center;max-width:300px;width:90%;
-  box-shadow:0 20px 60px rgba(0,0,0,.3)
-}
-.confirm-icon{
-  width:56px;height:56px;background:var(--accent);border-radius:50%;
-  margin:0 auto 16px;display:flex;align-items:center;justify-content:center
-}
+/* CONFIRM */
+#confirm-overlay{display:none;position:fixed;inset:0;z-index:90;background:rgba(13,31,51,.9);align-items:center;justify-content:center}
+.confirm-box{background:var(--surface);border-radius:16px;padding:32px 28px;text-align:center;max-width:300px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.confirm-icon{width:56px;height:56px;background:var(--accent);border-radius:50%;margin:0 auto 16px;display:flex;align-items:center;justify-content:center}
 .confirm-icon svg{width:28px;height:28px;stroke:#fff;stroke-width:3;fill:none}
 .confirm-title{font-size:18px;font-weight:900;color:var(--main);margin-bottom:8px}
 .confirm-sub{font-size:13px;color:var(--muted);line-height:1.8;margin-bottom:24px}
-#close-confirm{
-  width:100%;padding:14px;border-radius:24px;
-  background:var(--main);color:#fff;border:none;
-  font-size:13px;font-weight:700;letter-spacing:.1em;cursor:pointer
-}
+#close-confirm{width:100%;padding:14px;border-radius:24px;background:var(--main);color:#fff;border:none;font-size:13px;font-weight:700;letter-spacing:.1em;cursor:pointer}
 </style>
 </head>
 <body>
@@ -204,10 +143,18 @@ header{
 </header>
 <div id="call-toast">スタッフを呼びました！</div>
 
-<div class="cat-tabs" id="cat-tabs"></div>
+<!-- メニューページ -->
+<div class="page active" id="page-menu">
+  <div class="cat-tabs" id="cat-tabs"></div>
+  <div id="menu-view"></div>
+</div>
 
-<div id="menu-view"></div>
+<!-- 履歴ページ -->
+<div class="page" id="page-history">
+  <div id="history-view"></div>
+</div>
 
+<!-- カートバー -->
 <div id="cart-bar">
   <div class="cart-inner">
     <div class="cart-info">
@@ -218,6 +165,18 @@ header{
   </div>
 </div>
 
+<!-- ボトムタブ -->
+<nav class="bottom-tabs">
+  <button class="btab active" id="btab-menu" onclick="showPage('menu')">
+    <span class="btab-icon">🍺</span>メニュー
+  </button>
+  <button class="btab" id="btab-history" onclick="showPage('history')">
+    <span class="btab-icon">📋</span>注文履歴
+    <span class="btab-dot" id="hist-dot"></span>
+  </button>
+</nav>
+
+<!-- セッションブロック -->
 <div id="session-blocked">
   <div class="bl-icon">🔒</div>
   <div class="bl-table" id="bl-table"></div>
@@ -225,6 +184,7 @@ header{
   <div class="bl-msg" id="bl-msg">この席はまだ利用開始されていません。<br>スタッフにお声がけください。</div>
 </div>
 
+<!-- 注文完了 -->
 <div id="confirm-overlay">
   <div class="confirm-box">
     <div class="confirm-icon"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
@@ -250,7 +210,7 @@ const [appMod, fsMod] = await Promise.all([
 ]);
 const { initializeApp } = appMod;
 const { getFirestore, doc, getDoc, addDoc, collection, onSnapshot,
-        serverTimestamp, Timestamp, updateDoc } = fsMod;
+        serverTimestamp, Timestamp, deleteDoc } = fsMod;
 
 const app = initializeApp(firebaseConfig);
 const db  = getFirestore(app);
@@ -268,7 +228,6 @@ if (!shopId) {
   throw new Error("shopId missing");
 }
 
-// ─── 店舗データ読み込み ───
 const shopSnap = await getDoc(doc(db, "shops", shopId));
 if (!shopSnap.exists()) {
   document.getElementById("loading").innerHTML =
@@ -277,7 +236,6 @@ if (!shopSnap.exists()) {
 }
 const shop = shopSnap.data();
 
-// テーマ適用
 const R = document.documentElement.style;
 if (shop.mainColor)   R.setProperty("--main",   shop.mainColor);
 if (shop.accentColor) R.setProperty("--accent",  shop.accentColor);
@@ -294,8 +252,20 @@ document.getElementById("bl-table").textContent     = "Table " + tableId;
 
 const menu = shop.menu || [];
 const cart = {};
+const storageKey = `myOrderKeys_${shopId}_${tableId}`;
+window._myOrderKeys = JSON.parse(sessionStorage.getItem(storageKey) || "[]");
 
-// ─── カテゴリタブ生成 ───
+// ─── ページ切り替え ───
+window.showPage = function(page) {
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+  document.querySelectorAll(".btab").forEach(b => b.classList.remove("active"));
+  document.getElementById("page-" + page).classList.add("active");
+  document.getElementById("btab-" + page).classList.add("active");
+  if (page === "history") { renderHistory(); document.getElementById("hist-dot").classList.remove("show"); }
+  if (page === "menu") updateCartBar();
+};
+
+// ─── カテゴリタブ ───
 const catTabs = document.getElementById("cat-tabs");
 menu.forEach((cat, i) => {
   const btn = document.createElement("button");
@@ -306,12 +276,12 @@ menu.forEach((cat, i) => {
     document.querySelectorAll(".cat-tab").forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
     const sec = document.getElementById("sec-" + i);
-    if (sec) sec.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (sec) sec.scrollIntoView({ behavior:"smooth", block:"start" });
   };
   catTabs.appendChild(btn);
 });
 
-// ─── メニューグリッド生成 ───
+// ─── メニューグリッド ───
 const menuView = document.getElementById("menu-view");
 menuView.innerHTML = menu.map((cat, ci) => `
   <div id="sec-${ci}">
@@ -334,70 +304,127 @@ menuView.innerHTML = menu.map((cat, ci) => `
 
 // ─── カウンター ───
 window.adj = function(id, delta, name, price) {
-  const prev = cart[id] || 0;
-  const next = Math.max(0, prev + delta);
+  const next = Math.max(0, (cart[id] || 0) + delta);
   cart[id] = next;
-  const qEl     = document.getElementById("qty-" + id);
-  const badgeEl = document.getElementById("badge-" + id);
-  const cardEl  = document.getElementById("card-" + id);
-  if (qEl)     qEl.textContent = next;
-  if (badgeEl) { badgeEl.textContent = next; badgeEl.classList.toggle("show", next > 0); }
-  if (cardEl)  cardEl.classList.toggle("in-cart", next > 0);
+  const qEl = document.getElementById("qty-" + id);
+  const bEl = document.getElementById("badge-" + id);
+  const cEl = document.getElementById("card-" + id);
+  if (qEl) qEl.textContent = next;
+  if (bEl) { bEl.textContent = next; bEl.classList.toggle("show", next > 0); }
+  if (cEl) cEl.classList.toggle("in-cart", next > 0);
   updateCartBar();
 };
 
 function updateCartBar() {
   let count = 0, total = 0;
-  const allItems = menu.flatMap(c => c.items || []);
-  allItems.forEach(item => {
+  menu.flatMap(c => c.items || []).forEach(item => {
     const q = cart[item.id] || 0;
     count += q; total += q * item.price;
   });
   document.getElementById("cart-count").textContent = count + "品";
   document.getElementById("cart-total").textContent = "¥" + total.toLocaleString();
-  const bar = document.getElementById("cart-bar");
-  const btn = document.getElementById("order-btn");
-  bar.classList.toggle("visible", count > 0);
-  btn.disabled = count === 0;
+  document.getElementById("cart-bar").classList.toggle("visible", count > 0);
+  document.getElementById("order-btn").disabled = count === 0;
 }
+
+// ─── 注文履歴 ───
+function renderHistory() {
+  const el = document.getElementById("history-view");
+  const keys = window._myOrderKeys || [];
+  if (!keys.length) { el.innerHTML = '<div class="hist-empty">まだ注文履歴がありません</div>'; return; }
+  el.innerHTML = '<div style="padding:4px 0 8px;font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.15em">— 今回の注文 —</div>';
+}
+
+function escHtml(s) { return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+// ─── リアルタイム履歴監視 ───
+function watchOrders() {
+  const keys = window._myOrderKeys || [];
+  if (!keys.length) return;
+  keys.forEach(key => {
+    onSnapshot(doc(db, "orders", key), snap => {
+      renderHistoryFull();
+    });
+  });
+}
+
+const _histCache = {};
+function renderHistoryFull() {
+  const keys = window._myOrderKeys || [];
+  if (!keys.length) {
+    document.getElementById("history-view").innerHTML = '<div class="hist-empty">まだ注文履歴がありません</div>';
+    return;
+  }
+  // キーごとにデータを取得して描画
+  Promise.all(keys.map(k => getDoc(doc(db, "orders", k)))).then(snaps => {
+    const orders = snaps.map((s, i) => s.exists() ? { _key: keys[i], ...s.data() } : null).filter(Boolean);
+    const el = document.getElementById("history-view");
+    if (!orders.length) { el.innerHTML = '<div class="hist-empty">注文履歴がありません</div>'; return; }
+    const sLabel = { new:"受付中", working:"準備中", done:"完了" };
+    const sCls   = { new:"hstat-new", working:"hstat-working", done:"hstat-done" };
+    el.innerHTML = orders.reverse().map(o => {
+      const ms = o.createdAt?.toMillis ? o.createdAt.toMillis() : 0;
+      const tStr = ms ? (new Date(ms).getHours() + ":" + String(new Date(ms).getMinutes()).padStart(2,"0")) : "";
+      return `<div class="hist-card">
+        <div class="hist-head">
+          <span class="hist-time">${tStr}</span>
+          <span class="hist-total">¥${(o.total||0).toLocaleString()}</span>
+        </div>
+        <div class="hist-items">
+          ${(o.items||[]).map(i=>`<div class="hist-row"><strong>${escHtml(i.name)} ×${i.qty}</strong><span>¥${(i.price*i.qty).toLocaleString()}</span></div>`).join("")}
+        </div>
+        <div class="hist-foot">
+          <span class="hist-badge ${sCls[o.status]||'hstat-new'}">${sLabel[o.status]||o.status}</span>
+          ${o.status==="new" ? `<button class="hist-cancel" onclick="cancelOrder('${o._key}')">キャンセル</button>` : ""}
+        </div>
+      </div>`;
+    }).join("");
+  });
+}
+
+window.cancelOrder = async function(key) {
+  if (!confirm("この注文をキャンセルしますか？")) return;
+  try {
+    await deleteDoc(doc(db, "orders", key));
+    window._myOrderKeys = (window._myOrderKeys || []).filter(k => k !== key);
+    sessionStorage.setItem(storageKey, JSON.stringify(window._myOrderKeys));
+    renderHistoryFull();
+  } catch(e) { alert("キャンセルに失敗しました"); }
+};
 
 // ─── スタッフ呼び出し ───
 document.getElementById("call-btn-h").addEventListener("click", async () => {
   try {
     const sesSnap = await getDoc(doc(db, "sessions", `${shopId}_${tableId}`));
-    if (!sesSnap.exists() || !sesSnap.data().active) {
-      alert("この席はまだ利用開始されていません。");
-      return;
-    }
+    if (!sesSnap.exists() || !sesSnap.data().active) { alert("この席はまだ利用開始されていません。"); return; }
     await addDoc(collection(db, "calls"), { shopId, table: tableId, createdAt: serverTimestamp() });
     const t = document.getElementById("call-toast");
-    t.classList.add("show");
-    setTimeout(() => t.classList.remove("show"), 3000);
+    t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 3000);
   } catch(e) { alert("エラー: " + e.message); }
 });
 
 // ─── セッション監視 ───
 const sessionRef = doc(db, "sessions", `${shopId}_${tableId}`);
 onSnapshot(sessionRef, snap => {
-  const session  = snap.data();
-  const menuEl   = document.getElementById("menu-view");
-  const cartBar  = document.getElementById("cart-bar");
-  const blocked  = document.getElementById("session-blocked");
-
+  const session = snap.data();
+  const menuEl  = document.getElementById("menu-view");
+  const catEl   = document.getElementById("cat-tabs");
+  const blocked = document.getElementById("session-blocked");
   if (!session || !session.active) {
     menuEl.style.pointerEvents = "none"; menuEl.style.opacity = ".25";
-    cartBar.classList.remove("visible");
+    catEl.style.pointerEvents  = "none";
+    document.getElementById("cart-bar").classList.remove("visible");
     blocked.style.display = "flex";
-    document.getElementById("bl-msg").innerHTML =
-      "この席はまだ利用開始されていません。<br>スタッフにお声がけください。";
+    document.getElementById("bl-msg").innerHTML = "この席はまだ利用開始されていません。<br>スタッフにお声がけください。";
   } else if (sessionKey && session.session_id !== sessionKey) {
     menuEl.style.pointerEvents = "none"; menuEl.style.opacity = ".25";
-    cartBar.classList.remove("visible");
+    catEl.style.pointerEvents  = "none";
+    document.getElementById("cart-bar").classList.remove("visible");
     blocked.style.display = "flex";
-    document.getElementById("bl-msg").innerHTML =
-      "このQRコードは無効です。<br>スタッフにお声がけください。";
+    document.getElementById("bl-msg").innerHTML = "このQRコードは無効です。<br>スタッフにお声がけください。";
   } else {
     menuEl.style.pointerEvents = ""; menuEl.style.opacity = "1";
+    catEl.style.pointerEvents  = "";
     blocked.style.display = "none";
     updateCartBar();
   }
@@ -406,35 +433,33 @@ onSnapshot(sessionRef, snap => {
 // ─── 注文送信 ───
 document.getElementById("order-btn").addEventListener("click", async () => {
   const items = [];
-  const allItems = menu.flatMap(c => c.items || []);
-  allItems.forEach(item => {
+  menu.flatMap(c => c.items || []).forEach(item => {
     const q = cart[item.id] || 0;
     if (q > 0) items.push({ name: item.name, price: item.price, qty: q });
   });
   if (!items.length) return;
-  const total = items.reduce((s, i) => s + i.price * i.qty, 0);
-
+  const total = items.reduce((s,i) => s + i.price*i.qty, 0);
   const btn = document.getElementById("order-btn");
   btn.textContent = "送信中..."; btn.disabled = true;
-
   try {
     const sesSnap = await getDoc(sessionRef);
     const session = sesSnap.data();
-    if (!session || !session.active) {
-      alert("この席は利用できません。スタッフをお呼びください。");
-      btn.textContent = "注文を確定する"; btn.disabled = false; return;
-    }
-    if (sessionKey && session.session_id !== sessionKey) {
-      alert("このQRコードは無効です。スタッフをお呼びください。");
-      btn.textContent = "注文を確定する"; btn.disabled = false; return;
-    }
+    if (!session || !session.active) { alert("この席は利用できません。スタッフをお呼びください。"); btn.textContent="注文を確定する"; btn.disabled=false; return; }
+    if (sessionKey && session.session_id !== sessionKey) { alert("このQRコードは無効です。"); btn.textContent="注文を確定する"; btn.disabled=false; return; }
 
-    const deleteAt = Timestamp.fromMillis(Date.now() + 2 * 24 * 60 * 60 * 1000);
-    await addDoc(collection(db, "orders"), {
+    const deleteAt = Timestamp.fromMillis(Date.now() + 2*24*60*60*1000);
+    const ref = await addDoc(collection(db, "orders"), {
       shopId, table: tableId, items, total,
       status: "new", session_id: session.session_id,
-      createdAt: serverTimestamp(), deleteAt
+      createdAt: serverTimestamp(), deleteAt,
+      completedItems: []
     });
+
+    // 履歴に追加
+    const myKeys = [...(window._myOrderKeys || []), ref.id];
+    window._myOrderKeys = myKeys;
+    sessionStorage.setItem(storageKey, JSON.stringify(myKeys));
+    watchOrders();
 
     // カートリセット
     Object.keys(cart).forEach(k => { cart[k] = 0; });
@@ -447,7 +472,7 @@ document.getElementById("order-btn").addEventListener("click", async () => {
       if (cEl) cEl.classList.remove("in-cart");
     });
     updateCartBar();
-
+    document.getElementById("hist-dot").classList.add("show");
     document.getElementById("confirm-overlay").style.display = "flex";
     btn.textContent = "注文を確定する";
   } catch(e) {
@@ -465,16 +490,15 @@ const observer = new IntersectionObserver(entries => {
   entries.forEach(e => {
     if (e.isIntersecting) {
       const idx = e.target.id.replace("sec-","");
-      document.querySelectorAll(".cat-tab").forEach(b => {
-        b.classList.toggle("active", b.dataset.idx === idx);
-      });
+      document.querySelectorAll(".cat-tab").forEach(b => b.classList.toggle("active", b.dataset.idx === idx));
     }
   });
-}, { rootMargin: "-30% 0px -60% 0px" });
-menu.forEach((_, i) => {
-  const sec = document.getElementById("sec-" + i);
-  if (sec) observer.observe(sec);
-});
+}, { rootMargin:"-30% 0px -60% 0px" });
+menu.forEach((_,i) => { const s = document.getElementById("sec-"+i); if (s) observer.observe(s); });
+
+// 既存の注文を監視
+watchOrders();
+if ((window._myOrderKeys||[]).length) renderHistoryFull();
 
 // ─── ローディング非表示 ───
 setTimeout(() => {
