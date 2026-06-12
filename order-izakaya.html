@@ -70,7 +70,7 @@ header{position:sticky;top:0;z-index:50;background:var(--main);color:#fff;paddin
 .item-card-price{font-size:17px;font-weight:900;color:var(--price);letter-spacing:.02em}
 .item-card-price small{font-size:10px;font-weight:400;margin-left:1px}
 .item-card-counter{display:flex;align-items:center;justify-content:space-between;margin-top:4px}
-.cnt-btn{width:30px;height:30px;border-radius:50%;border:1.5px solid var(--border);background:var(--bg);color:var(--main);font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s,border-color .15s;line-height:1}
+.cnt-btn{width:36px;height:36px;border-radius:50%;border:1.5px solid var(--border);background:var(--bg);color:var(--main);font-size:18px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s,border-color .15s;line-height:1}
 .cnt-btn.plus{background:var(--main);border-color:var(--main);color:#fff}
 .cnt-btn.plus:active,.cnt-btn:active{opacity:.7}
 .cnt-num{font-size:16px;font-weight:900;color:var(--accent);min-width:24px;text-align:center}
@@ -365,6 +365,10 @@ function renderHistoryFull() {
     el.innerHTML = orders.reverse().map(o => {
       const ms = o.createdAt?.toMillis ? o.createdAt.toMillis() : 0;
       const tStr = ms ? (new Date(ms).getHours() + ":" + String(new Date(ms).getMinutes()).padStart(2,"0")) : "";
+      const completed = Array.isArray(o.completedItems) ? o.completedItems : [];
+      const totalServings = (o.items||[]).reduce((s,i) => s+i.qty, 0);
+      const doneCount = completed.length;
+      const progPct = totalServings > 0 ? Math.round(doneCount/totalServings*100) : 0;
       return `<div class="hist-card">
         <div class="hist-head">
           <span class="hist-time">${tStr}</span>
@@ -373,6 +377,10 @@ function renderHistoryFull() {
         <div class="hist-items">
           ${(o.items||[]).map(i=>`<div class="hist-row"><strong>${escHtml(i.name)} ×${i.qty}</strong><span>¥${(i.price*i.qty).toLocaleString()}</span></div>`).join("")}
         </div>
+        ${o.status!=="done" && totalServings>0 ? `<div style="padding:0 14px 8px;display:flex;align-items:center;gap:8px">
+          <div style="flex:1;height:4px;background:var(--border);border-radius:4px;overflow:hidden"><div style="height:100%;width:${progPct}%;background:var(--accent);border-radius:4px;transition:width .3s"></div></div>
+          <span style="font-size:10px;color:var(--muted)">${doneCount}/${totalServings}品提供済</span>
+        </div>` : ""}
         <div class="hist-foot">
           <span class="hist-badge ${sCls[o.status]||'hstat-new'}">${sLabel[o.status]||o.status}</span>
           ${o.status==="new" ? `<button class="hist-cancel" onclick="cancelOrder('${o._key}')">キャンセル</button>` : ""}

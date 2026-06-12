@@ -9,140 +9,181 @@
 /*
  * staff-izakaya.html — デモ用スタッフページ（居酒屋）
  * URL: staff-izakaya.html?shop=izakaya-demo
- * 品目別完了管理 + completedItems[] でFirestore管理
+ *
+ * completedItems データ形式: ["itemIdx-serveIdx", ...]
+ * 例: 生ビール×2, 焼き鳥×1 の場合
+ *   "0-0" = 生ビール1杯目
+ *   "0-1" = 生ビール2杯目
+ *   "1-0" = 焼き鳥1本目
  */
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
   --bg:#0f1e30;
-  --surface:#162840;
-  --surface2:#1d3550;
-  --border:#2a4a6a;
+  --s1:#162840;
+  --s2:#1d3550;
+  --border:#253d58;
   --text:#e8f4fd;
-  --muted:#6a9ec5;
+  --muted:#5a8ab0;
   --accent:#3a9fd8;
-  --green:#2ecc71;
-  --amber:#f39c12;
+  --green:#27ae60;
+  --amber:#e67e22;
   --red:#e74c3c;
-  --done-bg:#0d2a1a;
+  --purple:#8e44ad;
 }
 body{background:var(--bg);color:var(--text);font-family:'Noto Sans JP',sans-serif;min-height:100vh}
-
-/* LOADING */
-#loading{display:flex;align-items:center;justify-content:center;min-height:100vh;font-size:13px;color:var(--muted);letter-spacing:.2em}
+#loading{display:flex;align-items:center;justify-content:center;min-height:100vh;color:var(--muted);letter-spacing:.2em}
 #app{display:none}
 
 /* HEADER */
-header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 20px;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
-.h-logo{font-size:20px;font-weight:900;letter-spacing:.06em;color:var(--text);display:flex;align-items:center;gap:10px}
-#new-badge{display:none;background:var(--red);color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;animation:pulse 1.5s ease infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
-.h-meta{font-size:11px;color:var(--muted);letter-spacing:.1em}
+header{background:var(--s1);border-bottom:1px solid var(--border);height:56px;padding:0 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:60}
+.h-left{display:flex;align-items:center;gap:10px}
+.h-logo{font-size:18px;font-weight:900;color:var(--text)}
+#new-badge{display:none;background:var(--red);color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;animation:pulse 1.5s ease infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.h-right{display:flex;align-items:center;gap:8px}
+.h-sort{padding:5px 12px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:10px;font-weight:700;letter-spacing:.1em;cursor:pointer;border-radius:4px;transition:all .2s}
+.h-sort.active{border-color:var(--accent);color:var(--accent)}
+
+/* SETTINGS BAR */
+#settings-bar{background:var(--s2);border-bottom:1px solid var(--border);padding:8px 16px;display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+.sett{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)}
+.toggle{position:relative;width:34px;height:18px;display:inline-block}
+.toggle input{opacity:0;width:0;height:0}
+.tsl{position:absolute;cursor:pointer;inset:0;background:var(--border);border-radius:18px;transition:.2s}
+.tsl:before{position:absolute;content:"";width:12px;height:12px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.2s}
+.toggle input:checked+.tsl{background:var(--accent)}
+.toggle input:checked+.tsl:before{transform:translateX(16px)}
+.remind-row{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)}
+input[type=range]{accent-color:var(--accent);width:70px;height:4px}
+#rval{font-weight:700;color:var(--accent);min-width:16px}
 
 /* SUMMARY */
-#summary{background:var(--surface2);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;gap:20px;align-items:center}
-.sum-chip{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
-.sum-val{font-size:22px;font-weight:900;color:var(--text)}
-.sum-sep{flex:1}
-#reset-btn{padding:6px 16px;border:1px solid rgba(231,76,60,.4);background:transparent;color:var(--red);font-size:11px;font-weight:700;letter-spacing:.08em;cursor:pointer;border-radius:4px;transition:background .2s}
+#summary{background:var(--s1);border-bottom:1px solid var(--border);padding:8px 16px;display:flex;gap:0;overflow-x:auto;scrollbar-width:none}
+#summary::-webkit-scrollbar{display:none}
+.sum-chip{flex-shrink:0;display:flex;flex-direction:column;align-items:center;padding:6px 20px;border-right:1px solid var(--border)}
+.sum-chip:last-of-type{border-right:none}
+.sum-label{font-size:9px;font-weight:700;letter-spacing:.15em;color:var(--muted)}
+.sum-val{font-size:24px;font-weight:900;color:var(--text);line-height:1.1}
+.sum-spacer{flex:1}
+#reset-btn{flex-shrink:0;padding:6px 14px;border:1px solid rgba(231,76,60,.4);background:transparent;color:var(--red);font-size:10px;font-weight:700;letter-spacing:.08em;cursor:pointer;border-radius:4px;align-self:center;margin-left:8px;transition:background .2s}
 #reset-btn:hover{background:rgba(231,76,60,.1)}
 
 /* TABS */
-.tabs{display:flex;background:var(--surface);border-bottom:1px solid var(--border)}
-.tab{flex:1;padding:12px;font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--muted);background:transparent;border:none;border-bottom:2px solid transparent;cursor:pointer;transition:color .2s,border-color .2s}
+.tabs{display:flex;background:var(--s1);border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex-shrink:0;padding:12px 20px;font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--muted);background:transparent;border:none;border-bottom:2px solid transparent;cursor:pointer;transition:color .2s,border-color .2s;white-space:nowrap}
 .tab.active{color:var(--accent);border-bottom-color:var(--accent)}
 
-/* FILTER */
-.filter-row{display:flex;gap:8px;padding:10px 16px;overflow-x:auto;scrollbar-width:none;background:var(--bg);border-bottom:1px solid var(--border)}
-.filter-row::-webkit-scrollbar{display:none}
-.f-btn{flex-shrink:0;padding:5px 14px;border-radius:20px;border:1px solid var(--border);background:transparent;font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--muted);cursor:pointer;transition:all .2s}
-.f-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+/* TABLE FILTER */
+.table-filter{display:flex;gap:6px;padding:8px 16px;overflow-x:auto;scrollbar-width:none;background:var(--bg);border-bottom:1px solid var(--border)}
+.table-filter::-webkit-scrollbar{display:none}
+.tf-btn{flex-shrink:0;padding:4px 12px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:10px;font-weight:700;border-radius:20px;cursor:pointer;transition:all .2s}
+.tf-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
 
-/* ORDERS */
-#orders-wrap{padding:12px 16px;max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+/* STATUS FILTER */
+.stat-filter{display:flex;gap:6px;padding:6px 16px;background:var(--bg);border-bottom:1px solid var(--border)}
+.sf-btn{flex-shrink:0;padding:4px 12px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:10px;font-weight:700;border-radius:4px;cursor:pointer;transition:all .2s}
+.sf-btn.active{background:var(--s2);color:var(--text);border-color:var(--border)}
+.sf-new.active{border-color:var(--red);color:var(--red)}
+.sf-working.active{border-color:var(--amber);color:var(--amber)}
 
-/* ORDER CARD */
-.ocard{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;transition:opacity .3s}
-.ocard.is-done{opacity:.45;filter:grayscale(.3)}
-.ocard.remind{border-color:var(--amber);box-shadow:0 0 0 1px rgba(243,156,18,.3)}
-.ocard-head{display:flex;align-items:center;padding:12px 16px;gap:10px;border-bottom:1px solid var(--border)}
-.ocard-table{font-size:24px;font-weight:900;color:var(--accent);min-width:80px}
-.ocard-status{padding:4px 10px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:.1em}
-.st-new{background:rgba(231,76,60,.15);color:var(--red);border:1px solid rgba(231,76,60,.3)}
-.st-working{background:rgba(243,156,18,.15);color:var(--amber);border:1px solid rgba(243,156,18,.3)}
-.st-done{background:rgba(46,204,113,.15);color:var(--green);border:1px solid rgba(46,204,113,.3)}
-.ocard-meta{margin-left:auto;text-align:right}
-.ocard-time{font-size:11px;color:var(--muted)}
-.ocard-elapsed{font-size:12px;font-weight:700;margin-top:2px}
+/* ORDER LIST */
+#orders-wrap{padding:10px 12px;max-width:680px;margin:0 auto;display:flex;flex-direction:column;gap:10px}
+
+/* ORDER CARD — urgency tiers */
+.ocard{background:var(--s1);border:1px solid var(--border);border-radius:10px;overflow:hidden;transition:opacity .3s}
+.ocard.done-card{opacity:.35}
+.ocard.urg-warn{border-color:var(--amber)}
+.ocard.urg-late{border-color:var(--red);box-shadow:0 0 0 1px rgba(231,76,60,.25),0 0 12px rgba(231,76,60,.1)}
+
+/* CARD HEADER */
+.ocard-head{display:flex;align-items:stretch;border-bottom:1px solid var(--border)}
+.urgency-bar{width:5px;flex-shrink:0}
+.urg-ok   .urgency-bar{background:var(--green)}
+.urg-warn .urgency-bar{background:var(--amber)}
+.urg-late .urgency-bar{background:var(--red);animation:pulse 1.5s ease infinite}
+.ocard-head-inner{flex:1;display:flex;align-items:center;padding:10px 14px;gap:10px}
+.ocard-table{font-size:22px;font-weight:900;color:var(--text);min-width:88px}
+.ocard-status-chip{padding:3px 10px;border-radius:20px;font-size:9px;font-weight:700;letter-spacing:.12em;flex-shrink:0}
+.chip-new{background:rgba(231,76,60,.15);color:var(--red);border:1px solid rgba(231,76,60,.3)}
+.chip-working{background:rgba(230,126,34,.15);color:var(--amber);border:1px solid rgba(230,126,34,.3)}
+.chip-done{background:rgba(39,174,96,.15);color:var(--green);border:1px solid rgba(39,174,96,.3)}
+.ocard-right{margin-left:auto;text-align:right;flex-shrink:0}
+.ocard-time{font-size:10px;color:var(--muted)}
+.ocard-elapsed{font-size:13px;font-weight:700;margin-top:1px}
 .el-ok{color:var(--green)}
 .el-warn{color:var(--amber)}
-.el-late{color:var(--red);animation:pulse 1.5s ease infinite}
-.ocard-total{font-size:18px;font-weight:900;color:var(--text)}
+.el-late{color:var(--red)}
+.ocard-total{font-size:16px;font-weight:900;color:var(--text)}
 
-/* ITEMS */
-.ocard-items{padding:8px 16px}
-.item-row{display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);gap:10px}
-.item-row:last-child{border:none}
-.item-check{width:24px;height:24px;border-radius:50%;border:2px solid var(--border);background:transparent;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;font-size:14px}
-.item-check.done{background:var(--green);border-color:var(--green);color:#fff}
-.item-check:hover{border-color:var(--accent)}
-.item-name{flex:1;font-size:13px;font-weight:700;color:var(--text)}
-.item-name.done{text-decoration:line-through;opacity:.5}
-.item-qty{font-size:11px;color:var(--muted);min-width:28px;text-align:right}
-.item-price{font-size:12px;color:var(--muted);min-width:60px;text-align:right}
+/* PROGRESS BAR */
+.progress-row{padding:6px 14px 0;display:flex;align-items:center;gap:8px}
+.prog-bar-wrap{flex:1;height:4px;background:var(--border);border-radius:4px;overflow:hidden}
+.prog-bar{height:100%;background:var(--green);border-radius:4px;transition:width .3s}
+.prog-label{font-size:10px;color:var(--muted);flex-shrink:0}
+
+/* ITEMS — per serving rows */
+.ocard-items{padding:6px 14px 4px}
+.serve-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(37,61,88,.6)}
+.serve-row:last-child{border:none}
+.serve-check{width:28px;height:28px;border-radius:50%;border:2px solid var(--border);background:transparent;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .18s;font-size:15px;color:transparent}
+.serve-check:hover{border-color:var(--accent)}
+.serve-check.done{background:var(--green);border-color:var(--green);color:#fff}
+.serve-name{flex:1;font-size:13px;font-weight:700;color:var(--text)}
+.serve-name.done{text-decoration:line-through;color:var(--muted)}
+.serve-idx{font-size:10px;color:var(--muted);flex-shrink:0}
+.serve-price{font-size:11px;color:var(--muted);min-width:52px;text-align:right;flex-shrink:0}
 
 /* ACTIONS */
-.ocard-actions{padding:10px 16px 14px;display:flex;gap:8px;flex-wrap:wrap;border-top:1px solid var(--border)}
-.act{padding:8px 18px;border-radius:20px;border:1px solid;background:transparent;font-size:11px;font-weight:700;letter-spacing:.08em;cursor:pointer;transition:background .2s}
-.act-working{color:var(--amber);border-color:rgba(243,156,18,.4)}
-.act-working:hover{background:rgba(243,156,18,.1)}
-.act-done{color:var(--green);border-color:rgba(46,204,113,.4)}
-.act-done:hover{background:rgba(46,204,113,.1)}
-.act-cancel{color:var(--red);border-color:rgba(231,76,60,.3);font-size:10px;padding:6px 14px;margin-left:auto}
+.ocard-actions{padding:8px 14px 12px;display:flex;gap:6px;flex-wrap:wrap;border-top:1px solid var(--border)}
+.act{padding:7px 16px;border-radius:20px;border:1px solid;background:transparent;font-size:11px;font-weight:700;letter-spacing:.06em;cursor:pointer;transition:background .2s;flex-shrink:0}
+.act-working{color:var(--amber);border-color:rgba(230,126,34,.4)}
+.act-working:hover{background:rgba(230,126,34,.1)}
+.act-alldone{color:var(--green);border-color:rgba(39,174,96,.4)}
+.act-alldone:hover{background:rgba(39,174,96,.1)}
+.act-cancel{color:var(--red);border-color:rgba(231,76,60,.3);font-size:10px;padding:6px 12px;margin-left:auto}
 .act-cancel:hover{background:rgba(231,76,60,.1)}
 
 /* SEAT PANEL */
-#seat-panel{padding:12px 16px;max-width:640px;margin:0 auto;display:none;gap:10px;flex-direction:column}
+#seat-panel{padding:10px 12px;max-width:680px;margin:0 auto;display:none;flex-direction:column;gap:8px}
 #seat-panel.active{display:flex}
-.seat-row{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px}
-.seat-name{font-size:20px;font-weight:900;color:var(--text)}
-.seat-stat{font-size:10px;font-weight:700;letter-spacing:.1em;padding:3px 12px;border-radius:20px}
-.seat-on{background:rgba(46,204,113,.15);color:var(--green);border:1px solid rgba(46,204,113,.3)}
-.seat-off{background:rgba(255,255,255,.05);color:var(--muted);border:1px solid var(--border)}
-.seat-actions{display:flex;gap:8px}
-.seat-start-btn{padding:7px 18px;border:1px solid rgba(46,204,113,.4);background:transparent;color:var(--green);font-size:11px;font-weight:700;cursor:pointer;border-radius:20px;transition:background .2s}
-.seat-start-btn:hover{background:rgba(46,204,113,.1)}
-.seat-end-btn{padding:7px 18px;border:1px solid rgba(231,76,60,.4);background:transparent;color:var(--red);font-size:11px;font-weight:700;cursor:pointer;border-radius:20px;transition:background .2s}
-.seat-end-btn:hover{background:rgba(231,76,60,.1)}
+.seat-row{background:var(--s1);border:1px solid var(--border);border-radius:8px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.seat-name{font-size:18px;font-weight:900}
+.seat-on{background:rgba(39,174,96,.1);border-color:rgba(39,174,96,.3)}
+.seat-stat{font-size:10px;font-weight:700;letter-spacing:.1em;padding:3px 10px;border-radius:20px}
+.stat-on{background:rgba(39,174,96,.15);color:var(--green);border:1px solid rgba(39,174,96,.3)}
+.stat-off{background:rgba(255,255,255,.05);color:var(--muted);border:1px solid var(--border)}
+.seat-btns{display:flex;gap:6px}
+.sbtn{padding:7px 16px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;border:1px solid;background:transparent;transition:background .2s}
+.sbtn-start{color:var(--green);border-color:rgba(39,174,96,.4)}
+.sbtn-start:hover{background:rgba(39,174,96,.1)}
+.sbtn-end{color:var(--red);border-color:rgba(231,76,60,.4)}
+.sbtn-end:hover{background:rgba(231,76,60,.1)}
 
-/* HISTORY */
-#history-wrap{padding:12px 16px;max-width:640px;margin:0 auto;display:none}
-.empty{text-align:center;padding:60px;color:var(--muted);font-size:13px;border:1px dashed var(--border);border-radius:8px}
+/* HISTORY / ARCHIVE */
+#sub-wrap{padding:10px 12px;max-width:680px;margin:0 auto;display:none}
+.empty{text-align:center;padding:60px 20px;color:var(--muted);font-size:13px;border:1px dashed var(--border);border-radius:8px}
+.hist-group{margin-bottom:16px}
+.hist-group-head{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--s2);border:1px solid var(--border);border-radius:8px 8px 0 0;font-weight:700}
+.hist-group-head span{color:var(--accent);font-size:16px}
+.hist-card{background:var(--s1);border:1px solid var(--border);border-top:none;padding:10px 14px}
+.hist-card:last-child{border-radius:0 0 8px 8px}
+.hist-row{display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid rgba(37,61,88,.4)}
+.hist-row:last-child{border:none}
 
 /* RESET OVERLAY */
-#reset-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);align-items:center;justify-content:center;z-index:200}
-.reset-box{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:32px 28px;text-align:center;max-width:300px;width:90%}
-.reset-title{font-size:22px;font-weight:900;color:var(--red);margin-bottom:8px}
-.reset-sub{font-size:12px;color:var(--muted);line-height:1.8;margin-bottom:22px}
-.reset-btns{display:flex;gap:10px;justify-content:center}
-.rbtn-cancel{padding:10px 24px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:12px;cursor:pointer;border-radius:20px}
-.rbtn-ok{padding:10px 24px;border:1px solid rgba(231,76,60,.5);background:transparent;color:var(--red);font-size:12px;cursor:pointer;border-radius:20px}
+#reset-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);align-items:center;justify-content:center;z-index:200}
+.rbox{background:var(--s2);border:1px solid var(--border);border-radius:12px;padding:32px;text-align:center;max-width:300px;width:90%}
+.rbox h2{font-size:20px;font-weight:900;color:var(--red);margin-bottom:8px}
+.rbox p{font-size:12px;color:var(--muted);line-height:1.8;margin-bottom:20px}
+.rbox-btns{display:flex;gap:10px;justify-content:center}
+.rbtn{padding:10px 24px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid}
+.rbtn-cancel{border-color:var(--border);background:transparent;color:var(--muted)}
+.rbtn-ok{border-color:rgba(231,76,60,.5);background:transparent;color:var(--red)}
 .rbtn-ok:hover{background:rgba(231,76,60,.1)}
 
-/* SETTINGS */
-#settings-panel{background:var(--surface2);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;gap:16px;flex-wrap:wrap;align-items:center}
-.sett{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
-.toggle{position:relative;display:inline-block;width:36px;height:20px}
-.toggle input{opacity:0;width:0;height:0}
-.tslider{position:absolute;cursor:pointer;inset:0;background:var(--border);border-radius:20px;transition:.3s}
-.tslider:before{position:absolute;content:"";height:14px;width:14px;left:3px;bottom:3px;background:white;border-radius:50%;transition:.3s}
-.toggle input:checked+.tslider{background:var(--accent)}
-.toggle input:checked+.tslider:before{transform:translateX(16px)}
-.remind-sett{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
-input[type=range]{accent-color:var(--accent);width:80px}
-#rval{font-weight:700;color:var(--accent)}
-
 /* TOAST */
-#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--accent);color:#fff;padding:12px 24px;border-radius:20px;font-size:13px;font-weight:700;transition:transform .3s;z-index:300;white-space:nowrap;pointer-events:none}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--s2);border:1px solid var(--border);color:var(--text);padding:12px 24px;border-radius:20px;font-size:13px;font-weight:700;transition:transform .3s;z-index:300;white-space:nowrap;pointer-events:none;box-shadow:0 4px 20px rgba(0,0,0,.4)}
 #toast.show{transform:translateX(-50%) translateY(0)}
 </style>
 </head>
@@ -150,34 +191,29 @@ input[type=range]{accent-color:var(--accent);width:80px}
 <div id="loading">LOADING...</div>
 <div id="app">
   <header>
-    <div class="h-logo">
-      <span id="shop-name">—</span>
+    <div class="h-left">
+      <div class="h-logo" id="shop-name">—</div>
       <span id="new-badge"></span>
     </div>
-    <div class="h-meta">STAFF PANEL</div>
+    <div class="h-right">
+      <button class="h-sort active" id="sort-btn" onclick="toggleSort()">古い順 ↑</button>
+      <span style="font-size:10px;color:var(--muted);letter-spacing:.1em">STAFF</span>
+    </div>
   </header>
 
-  <div id="settings-panel">
-    <div class="sett">
-      <label class="toggle"><input type="checkbox" id="tog-sound" checked><span class="tslider"></span></label>
-      🔔 通知音
-    </div>
-    <div class="sett">
-      <label class="toggle"><input type="checkbox" id="tog-remind" checked><span class="tslider"></span></label>
-      ⏰ リマインド
-    </div>
-    <div class="remind-sett">
-      <input type="range" id="remind-range" min="3" max="30" value="10">
-      <span id="rval">10</span>分
-    </div>
+  <div id="settings-bar">
+    <div class="sett"><label class="toggle"><input type="checkbox" id="tog-sound" checked><span class="tsl"></span></label>🔔通知音</div>
+    <div class="sett"><label class="toggle"><input type="checkbox" id="tog-remind" checked><span class="tsl"></span></label>⏰リマインド</div>
+    <div class="remind-row"><input type="range" id="remind-range" min="3" max="30" value="10"><span id="rval">10</span>分で警告</div>
   </div>
 
   <div id="summary">
-    <div class="sum-chip">新着 <span class="sum-val" id="s-new">0</span></div>
-    <div class="sum-chip">準備中 <span class="sum-val" id="s-work">0</span></div>
-    <div class="sum-chip">完了 <span class="sum-val" id="s-done">0</span></div>
-    <div class="sum-sep"></div>
-    <button id="reset-btn" onclick="showReset()">営業終了リセット</button>
+    <div class="sum-chip"><div class="sum-label">新着</div><div class="sum-val" id="s-new" style="color:var(--red)">0</div></div>
+    <div class="sum-chip"><div class="sum-label">準備中</div><div class="sum-val" id="s-work" style="color:var(--amber)">0</div></div>
+    <div class="sum-chip"><div class="sum-label">完了</div><div class="sum-val" id="s-done" style="color:var(--green)">0</div></div>
+    <div class="sum-chip"><div class="sum-label">売上</div><div class="sum-val" id="s-sales" style="font-size:16px;padding-top:4px">¥0</div></div>
+    <div class="sum-spacer"></div>
+    <button id="reset-btn" onclick="showReset()">営業終了</button>
   </div>
 
   <nav class="tabs">
@@ -187,421 +223,330 @@ input[type=range]{accent-color:var(--accent);width:80px}
     <button class="tab" onclick="switchTab('archive')">過去の記録</button>
   </nav>
 
-  <div class="filter-row" id="filter-row">
-    <button class="f-btn active" onclick="setFilter('all',this)">すべて</button>
-    <button class="f-btn" onclick="setFilter('new',this)">新着</button>
-    <button class="f-btn" onclick="setFilter('working',this)">準備中</button>
+  <div class="table-filter" id="table-filter">
+    <button class="tf-btn active" onclick="setTF('all',this)">全席</button>
+  </div>
+  <div class="stat-filter" id="stat-filter">
+    <button class="sf-btn sf-all active" onclick="setSF('all',this)">すべて</button>
+    <button class="sf-btn sf-new" onclick="setSF('new',this)">新着のみ</button>
+    <button class="sf-btn sf-working" onclick="setSF('working',this)">準備中のみ</button>
   </div>
 
   <div id="orders-wrap"></div>
-  <div id="history-wrap"></div>
   <div id="seat-panel"></div>
+  <div id="sub-wrap"></div>
 </div>
 
 <div id="reset-overlay">
-  <div class="reset-box">
-    <div class="reset-title">営業終了リセット</div>
-    <div class="reset-sub">完了した注文をアーカイブして<br>全データを削除します。</div>
-    <div class="reset-btns">
-      <button class="rbtn-cancel" onclick="hideReset()">キャンセル</button>
-      <button class="rbtn-ok" onclick="doReset()">リセット</button>
+  <div class="rbox">
+    <h2>営業終了リセット</h2>
+    <p>完了済み注文をアーカイブして<br>全データを削除します。</p>
+    <div class="rbox-btns">
+      <button class="rbtn rbtn-cancel" onclick="hideReset()">キャンセル</button>
+      <button class="rbtn rbtn-ok" onclick="doReset()">リセット</button>
     </div>
   </div>
 </div>
 <div id="toast"></div>
 
 <script>
-document.getElementById("remind-range").addEventListener("input", function(){ document.getElementById("rval").textContent = this.value; });
-
-function showToast(msg) {
-  const t = document.getElementById("toast");
-  t.textContent = msg; t.classList.add("show");
-  setTimeout(() => t.classList.remove("show"), 3000);
-}
-function playSound() {
-  if (!document.getElementById("tog-sound").checked) return;
-  try {
-    const ctx = new (window.AudioContext||window.webkitAudioContext)();
-    [0,.15,.3].forEach((t,i) => {
-      const o=ctx.createOscillator(), g=ctx.createGain();
-      o.connect(g); g.connect(ctx.destination);
-      o.frequency.value=[880,1100,880][i]; o.type="sine";
-      g.gain.setValueAtTime(0,ctx.currentTime+t);
-      g.gain.linearRampToValueAtTime(.4,ctx.currentTime+t+.05);
-      g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+t+.5);
-      o.start(ctx.currentTime+t); o.stop(ctx.currentTime+t+.5);
-    });
-  } catch(e){}
-}
-function playRemind() {
-  try {
-    const ctx = new (window.AudioContext||window.webkitAudioContext)();
-    const o=ctx.createOscillator(), g=ctx.createGain();
-    o.connect(g); g.connect(ctx.destination);
-    o.frequency.value=440; o.type="triangle";
-    g.gain.setValueAtTime(.5,ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+1);
-    o.start(ctx.currentTime); o.stop(ctx.currentTime+1);
-  } catch(e){}
-}
-function playCall() {
-  if (!document.getElementById("tog-sound").checked) return;
-  try {
-    const ctx = new (window.AudioContext||window.webkitAudioContext)();
-    [0,.15,.3,.45,.6].forEach((t,i) => {
-      const o=ctx.createOscillator(), g=ctx.createGain();
-      o.connect(g); g.connect(ctx.destination);
-      o.frequency.value=[523,659,784,659,523][i]; o.type="sine";
-      g.gain.setValueAtTime(0,ctx.currentTime+t);
-      g.gain.linearRampToValueAtTime(.5,ctx.currentTime+t+.05);
-      g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+t+.55);
-      o.start(ctx.currentTime+t); o.stop(ctx.currentTime+t+.55);
-    });
-  } catch(e){}
-}
+document.getElementById("remind-range").addEventListener("input",function(){document.getElementById("rval").textContent=this.value;});
+function showToast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),3000);}
+function playSound(){if(!document.getElementById("tog-sound").checked)return;try{const ctx=new(window.AudioContext||window.webkitAudioContext)();[0,.15,.3].forEach((t,i)=>{const o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.frequency.value=[880,1100,880][i];o.type="sine";g.gain.setValueAtTime(0,ctx.currentTime+t);g.gain.linearRampToValueAtTime(.4,ctx.currentTime+t+.05);g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+t+.5);o.start(ctx.currentTime+t);o.stop(ctx.currentTime+t+.5);});}catch(e){}}
+function playRemind(){try{const ctx=new(window.AudioContext||window.webkitAudioContext)();const o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.frequency.value=440;o.type="triangle";g.gain.setValueAtTime(.5,ctx.currentTime);g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+1);o.start(ctx.currentTime);o.stop(ctx.currentTime+1);}catch(e){}}
+function playCall(){if(!document.getElementById("tog-sound").checked)return;try{const ctx=new(window.AudioContext||window.webkitAudioContext)();[0,.15,.3,.45,.6].forEach((t,i)=>{const o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.frequency.value=[523,659,784,659,523][i];o.type="sine";g.gain.setValueAtTime(0,ctx.currentTime+t);g.gain.linearRampToValueAtTime(.5,ctx.currentTime+t+.05);g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+t+.55);o.start(ctx.currentTime+t);o.stop(ctx.currentTime+t+.55);});}catch(e){}}
 </script>
 
 <script type="module">
-const firebaseConfig = {
-  apiKey:            "AIzaSyAFrmMUkpBXL-aBBxXjO8HBPOD2glM9jkk",
-  authDomain:        "qrclaud.firebaseapp.com",
-  projectId:         "qrclaud",
-  storageBucket:     "qrclaud.firebasestorage.app",
-  messagingSenderId: "1028256471338",
-  appId:             "1:1028256471338:web:539d7dc0e42f988a69e653"
-};
-const [appMod, fsMod] = await Promise.all([
-  import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"),
-  import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js")
-]);
-const { initializeApp } = appMod;
-const { getFirestore, doc, getDoc, getDocs, collection, addDoc, onSnapshot,
-        query, where, serverTimestamp, updateDoc, deleteDoc, setDoc } = fsMod;
+const firebaseConfig={apiKey:"AIzaSyAFrmMUkpBXL-aBBxXjO8HBPOD2glM9jkk",authDomain:"qrclaud.firebaseapp.com",projectId:"qrclaud",storageBucket:"qrclaud.firebasestorage.app",messagingSenderId:"1028256471338",appId:"1:1028256471338:web:539d7dc0e42f988a69e653"};
+const[appMod,fsMod]=await Promise.all([import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"),import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js")]);
+const{initializeApp}=appMod;
+const{getFirestore,doc,getDoc,getDocs,collection,addDoc,onSnapshot,query,where,serverTimestamp,updateDoc,deleteDoc,setDoc}=fsMod;
+const app=initializeApp(firebaseConfig);
+const db=getFirestore(app);
 
-const app = initializeApp(firebaseConfig);
-const db  = getFirestore(app);
+const shopId=new URLSearchParams(location.search).get("shop")||"";
+if(!shopId){document.getElementById("loading").innerHTML='<div style="color:var(--muted);text-align:center;padding:60px">URLに ?shop=店舗ID を指定してください<br><small>例: staff-izakaya.html?shop=izakaya-demo</small></div>';throw new Error("no shopId");}
 
-const shopId = new URLSearchParams(location.search).get("shop") || "";
-if (!shopId) {
-  document.getElementById("loading").innerHTML =
-    '<div style="text-align:center;color:#6a9ec5;padding:60px">URLに ?shop=店舗ID を指定してください<br><small>例: staff-izakaya.html?shop=izakaya-demo</small></div>';
-  throw new Error("shopId missing");
-}
+const shopSnap=await getDoc(doc(db,"shops",shopId));
+if(!shopSnap.exists()){document.getElementById("loading").innerHTML='<div style="color:var(--muted);text-align:center;padding:60px">店舗が見つかりません: '+shopId+'</div>';throw new Error("no shop");}
+const shop=shopSnap.data();
+document.title=(shop.name||shopId)+" — スタッフ";
+document.getElementById("shop-name").textContent=shop.name||shopId;
+document.getElementById("loading").style.display="none";
+document.getElementById("app").style.display="block";
 
-const shopSnap = await getDoc(doc(db, "shops", shopId));
-if (!shopSnap.exists()) {
-  document.getElementById("loading").innerHTML = '<div style="color:#6a9ec5;text-align:center;padding:60px">店舗が見つかりません: ' + shopId + '</div>';
-  throw new Error("shop not found");
-}
-const shop = shopSnap.data();
-document.title = (shop.name||shopId) + " — スタッフ";
-document.getElementById("shop-name").textContent = shop.name || shopId;
-document.getElementById("loading").style.display = "none";
-document.getElementById("app").style.display = "block";
+const tables=shop.tables||[];
+let allOrders={},curTab="active",curTF="all",curSF="all",sortOldFirst=true,remindedKeys={},notifGranted=false;
+if("Notification"in window)Notification.requestPermission().then(p=>{notifGranted=p==="granted";});
 
-const tables = shop.tables || [];
-let allOrders = {}, currentFilter = "all", currentTab = "active", remindedKeys = {}, notifGranted = false;
+// 席フィルター生成
+const tf=document.getElementById("table-filter");
+tables.forEach(t=>{const b=document.createElement("button");b.className="tf-btn";b.textContent="T"+t;b.onclick=function(){setTF(String(t),this);};tf.appendChild(b);});
+window.setTF=function(v,btn){curTF=v;document.querySelectorAll(".tf-btn").forEach(b=>b.classList.remove("active"));btn.classList.add("active");render();};
+window.setSF=function(v,btn){curSF=v;document.querySelectorAll(".sf-btn").forEach(b=>b.classList.remove("active"));btn.classList.add("active");render();};
 
-if ("Notification" in window) Notification.requestPermission().then(p => { notifGranted = p === "granted"; });
-
-// ─── 席管理パネル生成 ───
-const seatPanel = document.getElementById("seat-panel");
-seatPanel.innerHTML = tables.map(t => `
-  <div class="seat-row" id="seat-${t}">
-    <div class="seat-name">Table ${t}</div>
-    <div style="display:flex;align-items:center;gap:10px">
-      <span class="seat-stat seat-off" id="sstat-${t}">未使用 — Table ${t}</span>
-      <div class="seat-actions">
-        <button class="seat-start-btn" id="ss-${t}" onclick="startSeat('${t}')">利用開始</button>
-        <button class="seat-end-btn" id="se-${t}" onclick="endSeat('${t}')" style="display:none">終了</button>
-      </div>
+// 席管理
+const sp=document.getElementById("seat-panel");
+sp.innerHTML=tables.map(t=>`<div class="seat-row" id="seat-${t}">
+  <div class="seat-name">Table ${t}</div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <span class="seat-stat stat-off" id="sstat-${t}">未使用 — Table ${t}</span>
+    <div class="seat-btns">
+      <button class="sbtn sbtn-start" id="ss-${t}" onclick="startSeat('${t}')">利用開始</button>
+      <button class="sbtn sbtn-end" id="se-${t}" onclick="endSeat('${t}')" style="display:none">終了</button>
     </div>
-  </div>`).join("");
+  </div>
+</div>`).join("");
 
-tables.forEach(t => {
-  onSnapshot(doc(db, "sessions", `${shopId}_${t}`), snap => {
-    const s = snap.data() || {};
-    const stat = document.getElementById("sstat-" + t);
-    const ss   = document.getElementById("ss-" + t);
-    const se   = document.getElementById("se-" + t);
-    if (!stat) return;
-    if (s.active) {
-      stat.textContent = "利用中"; stat.className = "seat-stat seat-on";
-      if (ss) ss.style.display = "none";
-      if (se) se.style.display = "inline-block";
-    } else {
-      stat.textContent = "未使用 — Table " + t; stat.className = "seat-stat seat-off";
-      if (ss) ss.style.display = "inline-block";
-      if (se) se.style.display = "none";
-    }
+tables.forEach(t=>{
+  onSnapshot(doc(db,"sessions",`${shopId}_${t}`),snap=>{
+    const s=snap.data()||{};
+    const el=document.getElementById("sstat-"+t),ss=document.getElementById("ss-"+t),se=document.getElementById("se-"+t);
+    if(!el)return;
+    if(s.active){el.textContent="利用中";el.className="seat-stat stat-on";if(ss)ss.style.display="none";if(se)se.style.display="inline-block";}
+    else{el.textContent="未使用 — Table "+t;el.className="seat-stat stat-off";if(ss)ss.style.display="inline-block";if(se)se.style.display="none";}
   });
 });
+window.startSeat=async function(t){const sid=Date.now().toString(36)+Math.random().toString(36).slice(2,7);await setDoc(doc(db,"sessions",`${shopId}_${t}`),{session_id:sid,active:true,started_at:serverTimestamp()});showToast("Table "+t+" 利用開始");};
+window.endSeat=async function(t){if(!confirm("Table "+t+" を終了しますか？"))return;await updateDoc(doc(db,"sessions",`${shopId}_${t}`),{active:false,ended_at:serverTimestamp()});showToast("Table "+t+" 利用終了");};
 
-window.startSeat = async function(t) {
-  const sid = Date.now().toString(36) + Math.random().toString(36).slice(2,7);
-  await setDoc(doc(db, "sessions", `${shopId}_${t}`), { session_id: sid, active: true, started_at: serverTimestamp() });
-  showToast("Table " + t + " 利用開始");
-};
-window.endSeat = async function(t) {
-  if (!confirm("Table " + t + " を終了しますか？")) return;
-  await updateDoc(doc(db, "sessions", `${shopId}_${t}`), { active: false, ended_at: serverTimestamp() });
-  showToast("Table " + t + " 利用終了");
-};
-
-// ─── ユーティリティ ───
-function tsMs(ts) { return ts?.toMillis ? ts.toMillis() : (ts||0); }
-function elMin(ms) { return ms ? Math.floor((Date.now()-ms)/60000) : 0; }
-function timeAgo(ms) {
-  if (!ms) return "";
-  const d = Math.floor((Date.now()-ms)/1000);
-  if (d < 60) return d + "秒前";
-  if (d < 3600) return Math.floor(d/60) + "分前";
-  return Math.floor(d/3600) + "時間前";
-}
-function elapsedCls(min, remMin) {
-  if (min >= remMin) return "el-late";
-  if (min >= 5) return "el-warn";
-  return "el-ok";
-}
-
-// ─── フィルター ───
-window.setFilter = function(f, btn) {
-  currentFilter = f;
-  document.querySelectorAll(".f-btn").forEach(b => b.classList.remove("active"));
-  btn.classList.add("active");
-  render();
-};
-window.switchTab = function(tab) {
-  currentTab = tab;
-  const tabBtns = document.querySelectorAll(".tab");
-  tabBtns.forEach((b,i) => b.classList.toggle("active",
-    (i===0&&tab==="active")||(i===1&&tab==="history")||(i===2&&tab==="seats")||(i===3&&tab==="archive")));
-  document.getElementById("orders-wrap").style.display  = (tab==="active")  ? "flex"  : "none";
-  document.getElementById("history-wrap").style.display = (tab==="history") ? "block" : "none";
-  document.getElementById("seat-panel").classList.toggle("active", tab==="seats");
-  document.getElementById("filter-row").style.display   = (tab==="active")  ? "flex"  : "none";
-  if (tab==="archive") loadArchive();
+// タブ
+window.switchTab=function(tab){
+  curTab=tab;
+  document.querySelectorAll(".tab").forEach((b,i)=>b.classList.toggle("active",(i===0&&tab==="active")||(i===1&&tab==="history")||(i===2&&tab==="seats")||(i===3&&tab==="archive")));
+  document.getElementById("orders-wrap").style.display=(tab==="active")?"flex":"none";
+  document.getElementById("seat-panel").classList.toggle("active",tab==="seats");
+  document.getElementById("sub-wrap").style.display=(tab==="history"||tab==="archive")?"block":"none";
+  document.getElementById("table-filter").style.display=(tab==="active"||tab==="history")?"flex":"none";
+  document.getElementById("stat-filter").style.display=(tab==="active")?"flex":"none";
+  if(tab==="archive")loadArchive();
   else render();
 };
 
-// ─── リマインド ───
-function checkRemind() {
-  if (!document.getElementById("tog-remind").checked) return;
-  const remMin = parseInt(document.getElementById("remind-range").value);
-  Object.entries(allOrders).forEach(([k,o]) => {
-    if (o.status==="done") return;
-    const ms = tsMs(o.createdAt);
-    if (elMin(ms) >= remMin && !remindedKeys[k]) {
-      remindedKeys[k] = true;
-      playRemind();
-      showToast("⚠ Table " + o.table + " — " + remMin + "分経過！");
-      if (notifGranted) new Notification((shop.name||shopId)+" リマインド", { body:"Table "+o.table+" が"+remMin+"分未提供" });
+// ソート
+let _sortOld=true;
+window.toggleSort=function(){_sortOld=!_sortOld;document.getElementById("sort-btn").textContent=_sortOld?"古い順 ↑":"新しい順 ↓";render();};
+
+// ユーティリティ
+function tsMs(ts){return ts?.toMillis?ts.toMillis():(ts||0);}
+function elMin(ms){return ms?Math.floor((Date.now()-ms)/60000):0;}
+function timeAgo(ms){if(!ms)return"";const d=Math.floor((Date.now()-ms)/1000);if(d<60)return d+"秒前";if(d<3600)return Math.floor(d/60)+"分前";return Math.floor(d/3600)+"時間前";}
+
+// リマインド
+function checkRemind(){
+  if(!document.getElementById("tog-remind").checked)return;
+  const remMin=parseInt(document.getElementById("remind-range").value);
+  Object.entries(allOrders).forEach(([k,o])=>{
+    if(o.status==="done")return;
+    const ms=tsMs(o.createdAt);
+    if(elMin(ms)>=remMin&&!remindedKeys[k]){
+      remindedKeys[k]=true;playRemind();
+      showToast("⚠ Table "+o.table+" — "+remMin+"分経過！");
+      if(notifGranted)new Notification((shop.name||shopId)+" リマインド",{body:"Table "+o.table+" が"+remMin+"分未提供"});
     }
   });
 }
 
-// ─── 品目別完了チェック ───
-window.toggleItem = async function(orderId, idx) {
-  const o = allOrders[orderId];
-  if (!o || o.status === "done") return;
-  const completed = Array.isArray(o.completedItems) ? [...o.completedItems] : [];
-  const pos = completed.indexOf(idx);
-  if (pos === -1) completed.push(idx);
-  else completed.splice(pos, 1);
+// ─── 品提供単位の完了 ───
+// key形式: "itemIdx-serveIdx"  例) 生ビール2杯目 = "0-1"
+window.toggleServing=async function(orderId,itemIdx,serveIdx){
+  const o=allOrders[orderId];
+  if(!o||o.status==="done")return;
+  const key=`${itemIdx}-${serveIdx}`;
+  const completed=[...(o.completedItems||[])];
+  const pos=completed.indexOf(key);
+  if(pos===-1)completed.push(key);else completed.splice(pos,1);
 
-  const allDone = (o.items||[]).every((_,i) => completed.includes(i));
-  const update = { completedItems: completed };
-  if (allDone) update.status = "done";
-  else if (completed.length > 0) update.status = "working";
+  // 全servings数
+  const totalServings=(o.items||[]).reduce((s,i)=>s+i.qty,0);
+  const update={completedItems:completed};
+  if(completed.length===totalServings){update.status="done";remindedKeys[orderId]=true;}
+  else if(completed.length>0)update.status="working";
+  else update.status="new";
 
-  try { await updateDoc(doc(db,"orders",orderId), update); }
-  catch(e) { alert("更新失敗: " + e.message); }
+  try{await updateDoc(doc(db,"orders",orderId),update);}
+  catch(e){alert("更新失敗: "+e.message);}
+};
+
+// まとめて完了
+window.allDone=async function(orderId){
+  const o=allOrders[orderId];if(!o)return;
+  const allKeys=[];
+  (o.items||[]).forEach((item,ii)=>{for(let si=0;si<item.qty;si++)allKeys.push(`${ii}-${si}`);});
+  remindedKeys[orderId]=true;
+  await updateDoc(doc(db,"orders",orderId),{status:"done",completedItems:allKeys});
+};
+window.setWorking=async function(orderId){await updateDoc(doc(db,"orders",orderId),{status:"working"});};
+window.cancelOrder=async function(orderId,table){
+  if(!confirm("Table "+table+" の注文を取り消しますか？"))return;
+  await deleteDoc(doc(db,"orders",orderId));showToast("取り消しました");
 };
 
 // ─── 描画 ───
-function render() {
-  const remMin = parseInt(document.getElementById("remind-range").value);
-  const entries = Object.entries(allOrders).sort((a,b) => tsMs(b[1].createdAt) - tsMs(a[1].createdAt));
+function render(){
+  const remMin=parseInt(document.getElementById("remind-range").value);
+  let entries=Object.entries(allOrders);
+  // サマリー
+  let sN=0,sW=0,sD=0,sSales=0;
+  entries.forEach(([,o])=>{if(o.status==="new")sN++;else if(o.status==="working")sW++;else if(o.status==="done"){sD++;sSales+=(o.total||0);}});
+  document.getElementById("s-new").textContent=sN;
+  document.getElementById("s-work").textContent=sW;
+  document.getElementById("s-done").textContent=sD;
+  document.getElementById("s-sales").textContent="¥"+sSales.toLocaleString();
+  const badge=document.getElementById("new-badge");
+  badge.textContent=sN||"";badge.style.display=sN?"inline-block":"none";
 
-  let sNew=0, sWork=0, sDone=0;
-  entries.forEach(([,o]) => { if(o.status==="new") sNew++; else if(o.status==="working") sWork++; else if(o.status==="done") sDone++; });
-  document.getElementById("s-new").textContent  = sNew;
-  document.getElementById("s-work").textContent = sWork;
-  document.getElementById("s-done").textContent = sDone;
-  const badge = document.getElementById("new-badge");
-  badge.textContent = sNew||""; badge.style.display = sNew?"inline-block":"none";
+  if(curTab==="active"){
+    document.getElementById("orders-wrap").style.display="flex";
+    let active=entries.filter(([,o])=>o.status!=="done");
+    if(curSF!=="all")active=active.filter(([,o])=>o.status===curSF);
+    if(curTF!=="all")active=active.filter(([,o])=>String(o.table)===curTF);
+    // ソート: 古い順 or 新しい順
+    active.sort((a,b)=>_sortOld?(tsMs(a[1].createdAt)-tsMs(b[1].createdAt)):(tsMs(b[1].createdAt)-tsMs(a[1].createdAt)));
+    const wrap=document.getElementById("orders-wrap");
+    if(!active.length){wrap.innerHTML='<div class="empty">対応中の注文はありません</div>';return;}
+    const stCls={new:"chip-new",working:"chip-working",done:"chip-done"};
+    const stLbl={new:"新着",working:"準備中",done:"完了"};
+    wrap.innerHTML=active.map(([key,o])=>{
+      const ms=tsMs(o.createdAt);
+      const min=elMin(ms);
+      const urgCls=min>=remMin?"urg-late":min>=5?"urg-warn":"urg-ok";
+      const elCls=min>=remMin?"el-late":min>=5?"el-warn":"el-ok";
+      const completed=Array.isArray(o.completedItems)?o.completedItems:[];
+      const totalServings=(o.items||[]).reduce((s,i)=>s+i.qty,0);
+      const doneCount=completed.length;
+      const progPct=totalServings>0?Math.round(doneCount/totalServings*100):0;
 
-  if (currentTab === "active") {
-    let active = entries.filter(([,o]) => o.status !== "done");
-    if (currentFilter !== "all") active = active.filter(([,o]) => o.status === currentFilter);
-    const wrap = document.getElementById("orders-wrap");
-    wrap.style.display = "flex";
-    if (!active.length) { wrap.innerHTML = '<div class="empty">対応中の注文はありません</div>'; return; }
+      // 品目×個数でrow生成
+      const itemRows=(o.items||[]).map((item,ii)=>{
+        let rows="";
+        for(let si=0;si<item.qty;si++){
+          const sKey=`${ii}-${si}`;
+          const isDone=completed.includes(sKey);
+          const serveLabel=item.qty>1?`${si+1}/${item.qty}`:"";
+          rows+=`<div class="serve-row">
+            <button class="serve-check${isDone?" done":""}" onclick="toggleServing('${key}',${ii},${si})">${isDone?"✓":""}</button>
+            <span class="serve-name${isDone?" done":""}">${item.name}</span>
+            ${serveLabel?`<span class="serve-idx">${serveLabel}</span>`:""}
+            <span class="serve-price">¥${item.price.toLocaleString()}</span>
+          </div>`;
+        }return rows;
+      }).join("");
 
-    wrap.innerHTML = active.map(([key,o]) => {
-      const ms = tsMs(o.createdAt);
-      const min = elMin(ms);
-      const ecls = elapsedCls(min, remMin);
-      const completed = Array.isArray(o.completedItems) ? o.completedItems : [];
-      const stCls = { new:"st-new", working:"st-working", done:"st-done" };
-      const stLbl = { new:"新着", working:"準備中", done:"完了" };
-      return `<div class="ocard${o.status==="done"?" is-done":""}${ecls==="el-late"?" remind":""}">
+      return `<div class="ocard ${urgCls}">
         <div class="ocard-head">
-          <div class="ocard-table">Table ${o.table}</div>
-          <span class="ocard-status ${stCls[o.status]||'st-new'}">${stLbl[o.status]||o.status}</span>
-          <div class="ocard-meta">
-            <div class="ocard-time">${timeAgo(ms)}</div>
-            <div class="ocard-elapsed ${ecls}">⏱ ${min}分</div>
-            <div class="ocard-total">¥${(o.total||0).toLocaleString()}</div>
+          <div class="urgency-bar"></div>
+          <div class="ocard-head-inner">
+            <div class="ocard-table">Table ${o.table}</div>
+            <span class="ocard-status-chip ${stCls[o.status]||'chip-new'}">${stLbl[o.status]||o.status}</span>
+            <div class="ocard-right">
+              <div class="ocard-time">${timeAgo(ms)}</div>
+              <div class="ocard-elapsed ${elCls}">⏱ ${min}分</div>
+              <div class="ocard-total">¥${(o.total||0).toLocaleString()}</div>
+            </div>
           </div>
         </div>
-        <div class="ocard-items">
-          ${(o.items||[]).map((item,idx) => {
-            const done = completed.includes(idx);
-            return `<div class="item-row">
-              <button class="item-check${done?" done":""}" onclick="toggleItem('${key}',${idx})">${done?"✓":""}</button>
-              <span class="item-name${done?" done":""}">${item.name}</span>
-              <span class="item-qty">×${item.qty}</span>
-              <span class="item-price">¥${(item.price*item.qty).toLocaleString()}</span>
-            </div>`;
-          }).join("")}
+        <div class="progress-row">
+          <div class="prog-bar-wrap"><div class="prog-bar" style="width:${progPct}%"></div></div>
+          <div class="prog-label">${doneCount}/${totalServings}品提供</div>
         </div>
+        <div class="ocard-items">${itemRows}</div>
         <div class="ocard-actions">
-          ${o.status==="new"     ? `<button class="act act-working" onclick="setStatus('${key}','working')">準備中にする</button>` : ""}
-          ${o.status==="working" ? `<button class="act act-done"    onclick="setStatus('${key}','done')">まとめて完了</button>` : ""}
+          ${o.status==="new"?`<button class="act act-working" onclick="setWorking('${key}')">準備中にする</button>`:""}
+          <button class="act act-alldone" onclick="allDone('${key}')">まとめて完了</button>
           <button class="act act-cancel" onclick="cancelOrder('${key}','${o.table}')">取消</button>
         </div>
       </div>`;
     }).join("");
 
-  } else if (currentTab === "history") {
-    const wrap = document.getElementById("history-wrap");
-    wrap.style.display = "block";
-    const done = entries.filter(([,o]) => o.status==="done");
-    if (!done.length) { wrap.innerHTML = '<div class="empty">完了した注文はまだありません</div>'; return; }
-    const groups = {};
-    done.forEach(([,o]) => { const t=String(o.table); (groups[t]=groups[t]||[]).push(o); });
-    const total = done.reduce((s,[,o]) => s+(o.total||0), 0);
-    wrap.innerHTML = Object.entries(groups).map(([tname,ords]) => {
-      const tt = ords.reduce((s,o) => s+(o.total||0), 0);
-      return `<div style="margin-bottom:16px">
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px 8px 0 0">
-          <span style="font-size:18px;font-weight:900;color:var(--accent)">Table ${tname}</span>
-          <span style="font-size:16px;font-weight:700;color:var(--text)">¥${tt.toLocaleString()}</span>
-        </div>
-        ${ords.map(o=>`<div class="ocard is-done" style="border-radius:0;border-top:none">
-          <div class="ocard-head">
-            <span class="ocard-status st-done">完了</span>
-            <div class="ocard-meta"><div class="ocard-time">${timeAgo(tsMs(o.createdAt))}</div><div class="ocard-total">¥${(o.total||0).toLocaleString()}</div></div>
-          </div>
-          <div class="ocard-items">${(o.items||[]).map(i=>`<div class="item-row"><span class="item-name">${i.name}</span><span class="item-qty">×${i.qty}</span><span class="item-price">¥${(i.price*i.qty).toLocaleString()}</span></div>`).join("")}</div>
-        </div>`).join("")}
+  } else if(curTab==="history"){
+    const wrap=document.getElementById("sub-wrap");wrap.style.display="block";
+    let done=entries.filter(([,o])=>o.status==="done");
+    if(curTF!=="all")done=done.filter(([,o])=>String(o.table)===curTF);
+    if(!done.length){wrap.innerHTML='<div class="empty">完了した注文はまだありません</div>';return;}
+    const groups={};
+    done.forEach(([,o])=>{const t=String(o.table);(groups[t]=groups[t]||[]).push(o);});
+    const gtotal=done.reduce((s,[,o])=>s+(o.total||0),0);
+    wrap.innerHTML=Object.entries(groups).map(([tname,ords])=>{
+      const tt=ords.reduce((s,o)=>s+(o.total||0),0);
+      return`<div class="hist-group">
+        <div class="hist-group-head"><span>Table ${tname}</span><span>¥${tt.toLocaleString()}</span></div>
+        ${ords.map(o=>`<div class="hist-card">${(o.items||[]).map(i=>`<div class="hist-row"><span>${i.name} ×${i.qty}</span><span>¥${(i.price*i.qty).toLocaleString()}</span></div>`).join("")}</div>`).join("")}
       </div>`;
-    }).join("") +
-    `<div style="text-align:right;padding:12px 4px;font-size:18px;font-weight:900;color:var(--accent);border-top:1px solid var(--border)">完了合計 ¥${total.toLocaleString()}</div>`;
+    }).join("")+`<div style="text-align:right;padding:12px 4px;font-size:16px;font-weight:900;color:var(--accent);border-top:1px solid var(--border)">本日完了合計 ¥${gtotal.toLocaleString()}</div>`;
   }
 }
 
-// ─── 注文操作 ───
-window.setStatus = async function(id, status) {
-  if (status==="done") {
-    remindedKeys[id] = true;
-    const o = allOrders[id];
-    const allIdx = (o?.items||[]).map((_,i)=>i);
-    await updateDoc(doc(db,"orders",id), { status, completedItems: allIdx });
-  } else {
-    await updateDoc(doc(db,"orders",id), { status });
-  }
-};
-window.cancelOrder = async function(id, table) {
-  if (!confirm("Table "+table+" の注文を取り消しますか？")) return;
-  await deleteDoc(doc(db,"orders",id));
-  showToast("Table "+table+" の注文を取り消しました");
-};
-
-// ─── Firestore監視 ───
-const ordersQ = query(collection(db,"orders"), where("shopId","==",shopId));
-const prevIds = new Set();
-onSnapshot(ordersQ, snap => {
-  allOrders = {};
-  snap.forEach(d => {
-    allOrders[d.id] = d.data();
-    if (!prevIds.has(d.id) && d.data().status==="new" && prevIds.size>0) {
-      playSound();
-      showToast("🍽 Table "+d.data().table+" から注文が入りました");
-      if (notifGranted) new Notification((shop.name||shopId)+" — 新しい注文", { body:"Table "+d.data().table+" から注文" });
+// Firestore監視
+const ordersQ=query(collection(db,"orders"),where("shopId","==",shopId));
+const prevIds=new Set();
+onSnapshot(ordersQ,snap=>{
+  allOrders={};
+  snap.forEach(d=>{
+    allOrders[d.id]=d.data();
+    if(!prevIds.has(d.id)&&d.data().status==="new"&&prevIds.size>0){
+      playSound();showToast("🍽 Table "+d.data().table+" から注文が入りました");
+      if(notifGranted)new Notification((shop.name||shopId)+" — 新しい注文",{body:"Table "+d.data().table+" から注文"});
     }
     prevIds.add(d.id);
   });
-  [...prevIds].forEach(id => { if (!allOrders[id]) prevIds.delete(id); });
-  render(); checkRemind();
+  [...prevIds].forEach(id=>{if(!allOrders[id])prevIds.delete(id);});
+  render();checkRemind();
 });
 
-const callsQ = query(collection(db,"calls"), where("shopId","==",shopId));
-const knownCalls = new Set();
-onSnapshot(callsQ, snap => {
-  snap.forEach(d => {
-    if (!knownCalls.has(d.id)) {
+const callsQ=query(collection(db,"calls"),where("shopId","==",shopId));
+const knownCalls=new Set();
+onSnapshot(callsQ,snap=>{
+  snap.forEach(d=>{
+    if(!knownCalls.has(d.id)){
       knownCalls.add(d.id);
-      const c = d.data();
-      const ms = tsMs(c.createdAt);
-      if (knownCalls.size>1 || Date.now()-ms<10000) {
-        playCall();
-        showToast("🔔 Table "+c.table+" — スタッフを呼んでいます！");
-        if (notifGranted) new Notification((shop.name||shopId)+" — 呼び出し", { body:"Table "+c.table+" がスタッフを呼んでいます" });
+      const c=d.data();const ms=tsMs(c.createdAt);
+      if(knownCalls.size>1||Date.now()-ms<10000){
+        playCall();showToast("🔔 Table "+c.table+" — スタッフを呼んでいます！");
+        if(notifGranted)new Notification((shop.name||shopId)+" — 呼び出し",{body:"Table "+c.table+" がスタッフを呼んでいます"});
       }
     }
   });
 });
 
-// ─── リセット ───
-window.showReset = () => { document.getElementById("reset-overlay").style.display="flex"; };
-window.hideReset = () => { document.getElementById("reset-overlay").style.display="none"; };
-window.doReset = async function() {
-  try {
-    const today = new Date();
-    const dateKey = today.getFullYear()+"-"+String(today.getMonth()+1).padStart(2,"0")+"-"+String(today.getDate()).padStart(2,"0");
-    for (const [id,o] of Object.entries(allOrders)) {
-      if (o.status==="done") await addDoc(collection(db,"archive"), {...o,shopId,date:dateKey,archivedAt:serverTimestamp()});
-    }
-    for (const id of Object.keys(allOrders)) await deleteDoc(doc(db,"orders",id));
-    const cSnap = await getDocs(query(collection(db,"calls"),where("shopId","==",shopId)));
-    for (const d of cSnap.docs) await deleteDoc(d.ref);
+// リセット
+window.showReset=()=>{document.getElementById("reset-overlay").style.display="flex";};
+window.hideReset=()=>{document.getElementById("reset-overlay").style.display="none";};
+window.doReset=async function(){
+  try{
+    const today=new Date();
+    const dk=today.getFullYear()+"-"+String(today.getMonth()+1).padStart(2,"0")+"-"+String(today.getDate()).padStart(2,"0");
+    for(const[id,o]of Object.entries(allOrders)){if(o.status==="done")await addDoc(collection(db,"archive"),{...o,shopId,date:dk,archivedAt:serverTimestamp()});}
+    for(const id of Object.keys(allOrders))await deleteDoc(doc(db,"orders",id));
+    const cs=await getDocs(query(collection(db,"calls"),where("shopId","==",shopId)));
+    for(const d of cs.docs)await deleteDoc(d.ref);
     document.getElementById("reset-overlay").style.display="none";
-    allOrders={}; remindedKeys={};
-    render();
-    showToast("営業終了リセット完了");
-  } catch(e) { alert("リセット失敗: "+e); }
+    allOrders={};remindedKeys={};render();showToast("営業終了リセット完了");
+  }catch(e){alert("リセット失敗: "+e);}
 };
 
-// ─── アーカイブ ───
-async function loadArchive() {
-  const el = document.getElementById("history-wrap");
-  el.style.display = "block";
-  el.innerHTML = '<div class="empty">読み込み中...</div>';
-  try {
-    const snap = await getDocs(query(collection(db,"archive"),where("shopId","==",shopId)));
-    if (snap.empty) { el.innerHTML = '<div class="empty">過去の記録はありません</div>'; return; }
-    const byDate = {};
-    snap.forEach(d => { const o=d.data(); (byDate[o.date]=byDate[o.date]||[]).push(o); });
-    el.innerHTML = Object.keys(byDate).sort().reverse().map(date => {
-      const ords = byDate[date];
-      const dt = ords.reduce((s,o) => s+(o.total||0), 0);
-      return `<div style="margin-bottom:20px">
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px 8px 0 0">
-          <span style="font-size:18px;font-weight:900;color:var(--accent)">${date}</span>
-          <span style="font-weight:700">合計 ¥${dt.toLocaleString()}</span>
-        </div>
-        ${ords.map(o=>`<div class="ocard is-done" style="border-radius:0;border-top:none">
-          <div class="ocard-head"><span class="ocard-status st-done">完了</span><div class="ocard-meta"><div class="ocard-total">¥${(o.total||0).toLocaleString()}</div></div></div>
-          <div class="ocard-items">${(o.items||[]).map(i=>`<div class="item-row"><span class="item-name">${i.name}</span><span class="item-qty">×${i.qty}</span><span class="item-price">¥${(i.price*i.qty).toLocaleString()}</span></div>`).join("")}</div>
-        </div>`).join("")}
+// アーカイブ
+async function loadArchive(){
+  const el=document.getElementById("sub-wrap");el.style.display="block";
+  el.innerHTML='<div class="empty">読み込み中...</div>';
+  try{
+    const snap=await getDocs(query(collection(db,"archive"),where("shopId","==",shopId)));
+    if(snap.empty){el.innerHTML='<div class="empty">過去の記録はありません</div>';return;}
+    const byDate={};
+    snap.forEach(d=>{const o=d.data();(byDate[o.date]=byDate[o.date]||[]).push(o);});
+    el.innerHTML=Object.keys(byDate).sort().reverse().map(date=>{
+      const ords=byDate[date];
+      const dt=ords.reduce((s,o)=>s+(o.total||0),0);
+      return`<div class="hist-group">
+        <div class="hist-group-head"><span>${date}</span><span>合計 ¥${dt.toLocaleString()}</span></div>
+        ${ords.map(o=>`<div class="hist-card">${(o.items||[]).map(i=>`<div class="hist-row"><span>${i.name} ×${i.qty}</span><span>¥${(i.price*i.qty).toLocaleString()}</span></div>`).join("")}</div>`).join("")}
       </div>`;
     }).join("");
-  } catch(e) { el.innerHTML = '<div class="empty">読み込み失敗</div>'; }
+  }catch(e){el.innerHTML='<div class="empty">読み込み失敗</div>';}
 }
 
-setInterval(() => { render(); checkRemind(); }, 60000);
+setInterval(()=>{render();checkRemind();},60000);
 </script>
 </body>
 </html>
