@@ -275,6 +275,7 @@ header{text-align:center;padding:32px 24px 24px;border-bottom:2px solid var(--bo
 <div id="session-blocked" style="display:none">
   <div class="blocked-icon">🔒</div>
   <p class="blocked-title">ご注文いただけません</p>
+  <p id="blocked-table" style="font-family:'Playfair Display',serif;font-size:22px;color:var(--accent);margin-bottom:6px"></p>
   <p class="blocked-msg" id="blocked-msg">この席はまだ利用開始されていません。<br>スタッフにお声がけください。</p>
 </div>
 
@@ -445,11 +446,13 @@ onSnapshot(sessionRef, snap => {
     menuEl.style.opacity = "0.3";
     cartBar.style.display = "none";
     blocked.style.display = "flex";
+    document.getElementById("blocked-table").textContent = "Table " + tableId;
     document.getElementById("blocked-msg").textContent = "この席はまだ利用開始されていません。\nスタッフにお声がけください。";
   } else if (sessionKey && session.session_id !== sessionKey) {
     menuEl.style.opacity = "0.3";
     cartBar.style.display = "none";
     blocked.style.display = "flex";
+    document.getElementById("blocked-table").textContent = "Table " + tableId;
     document.getElementById("blocked-msg").textContent = "このQRコードは無効です。スタッフにお声がけください。";
   } else {
     menuEl.style.opacity = "1";

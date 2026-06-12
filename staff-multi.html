@@ -381,7 +381,7 @@ seatPanel.innerHTML = tables.map(t => `
       <div class="seat-sid" id="sid-${t}">—</div>
     </div>
     <div class="seat-actions">
-      <span class="seat-status seat-inactive" id="sstat-${t}">未使用</span>
+      <span class="seat-status seat-inactive" id="sstat-${t}">未使用 — Table ${t}</span>
       <button class="seat-start" id="sbtn-start-${t}" onclick="startSeat('${t}')">利用開始</button>
       <button class="seat-end" id="sbtn-end-${t}" onclick="endSeat('${t}')" style="display:none">利用終了</button>
     </div>
@@ -678,7 +678,7 @@ tables.forEach(t => {
       if (endBtn)   endBtn.style.display = "inline-block";
       if (sidEl)    sidEl.textContent = "ID: " + (s.session_id || "").slice(0, 8) + "…";
     } else {
-      statEl.textContent = "未使用"; statEl.className = "seat-status seat-inactive";
+      statEl.textContent = "未使用 — Table " + t; statEl.className = "seat-status seat-inactive";
       if (startBtn) startBtn.style.display = "inline-block";
       if (endBtn)   endBtn.style.display = "none";
       if (sidEl)    sidEl.textContent = "—";
