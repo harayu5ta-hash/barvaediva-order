@@ -378,6 +378,15 @@ window.allDone=async function(orderId){
   await updateDoc(doc(db,"orders",orderId),{status:"done",completedItems:allKeys});
 };
 window.setWorking=async function(orderId){await updateDoc(doc(db,"orders",orderId),{status:"working"});};
+window.undoOrder=async function(id){
+  try{await updateDoc(doc(db,"orders",id),{status:"working",completedItems:[]});showToast("対応中に戻しました");}
+  catch(e){alert("失敗しました: "+e);}
+};
+window.deleteOrder=async function(id,table){
+  if(!confirm("Table "+table+" のこの注文を削除しますか？"))return;
+  try{await deleteDoc(doc(db,"orders",id));showToast("削除しました");}
+  catch(e){alert("失敗しました: "+e);}
+};
 window.cancelOrder=async function(orderId,table){
   if(!confirm("Table "+table+" の注文を取り消しますか？"))return;
   await deleteDoc(doc(db,"orders",orderId));showToast("取り消しました");
@@ -466,13 +475,19 @@ function render(){
     if(curTF!=="all")done=done.filter(([,o])=>String(o.table)===curTF);
     if(!done.length){wrap.innerHTML='<div class="empty">完了した注文はまだありません</div>';return;}
     const groups={};
-    done.forEach(([,o])=>{const t=String(o.table);(groups[t]=groups[t]||[]).push(o);});
+    done.forEach(([key,o])=>{const t=String(o.table);(groups[t]=groups[t]||[]).push([key,o]);});
     const gtotal=done.reduce((s,[,o])=>s+(o.total||0),0);
     wrap.innerHTML=Object.entries(groups).map(([tname,ords])=>{
-      const tt=ords.reduce((s,o)=>s+(o.total||0),0);
+      const tt=ords.reduce((s,[,o])=>s+(o.total||0),0);
       return`<div class="hist-group">
         <div class="hist-group-head"><span>Table ${tname}</span><span>¥${tt.toLocaleString()}</span></div>
-        ${ords.map(o=>`<div class="hist-card">${(o.items||[]).map(i=>`<div class="hist-row"><span>${i.name} ×${i.qty}</span><span>¥${(i.price*i.qty).toLocaleString()}</span></div>`).join("")}</div>`).join("")}
+        ${ords.map(([key,o])=>`<div class="hist-card">
+          ${(o.items||[]).map(i=>`<div class="hist-row"><span>${i.name} ×${i.qty}</span><span>¥${(i.price*i.qty).toLocaleString()}</span></div>`).join("")}
+          <div style="display:flex;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+            <button class="sbtn sbtn-start" style="font-size:10px;padding:5px 12px" onclick="undoOrder('${key}')">対応中に戻す</button>
+            <button class="sbtn sbtn-end" style="font-size:10px;padding:5px 12px" onclick="deleteOrder('${key}','${o.table}')">削除</button>
+          </div>
+        </div>`).join("")}
       </div>`;
     }).join("")+`<div style="text-align:right;padding:12px 4px;font-size:16px;font-weight:900;color:var(--accent);border-top:1px solid var(--border)">本日完了合計 ¥${gtotal.toLocaleString()}</div>`;
   }
@@ -486,8 +501,12 @@ onSnapshot(ordersQ,snap=>{
   snap.forEach(d=>{
     allOrders[d.id]=d.data();
     if(!prevIds.has(d.id)&&d.data().status==="new"&&prevIds.size>0){
-      playSound();showToast("🍽 Table "+d.data().table+" から注文が入りました");
-      if(notifGranted)new Notification((shop.name||shopId)+" — 新しい注文",{body:"Table "+d.data().table+" から注文"});
+      const _items=d.data().items||[];
+      const _alcoholKw=["ビール","日本酒","焼酎","ハイボール","チューハイ","ワイン","カクテル","ウィスキー","ウイスキー","リモンチェッロ","グラッパ","Kir","Mimosa","Spritz","酒"];
+      const _hasAlcohol=_items.some(i=>_alcoholKw.some(kw=>i.name.includes(kw)));
+      const _toastMsg="🍽 Table "+d.data().table+" から注文が入りました"+(_hasAlcohol?" 🍺お酒はストローいらんぞ":"");
+      playSound();showToast(_toastMsg);
+      if(notifGranted)new Notification((shop.name||shopId)+" — 新しい注文",{body:"Table "+d.data().table+" から注文"+(_hasAlcohol?" / お酒はストローいらんぞ":"")});
     }
     prevIds.add(d.id);
   });
