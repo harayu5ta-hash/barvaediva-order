@@ -580,20 +580,29 @@ async function init(){
     fb.insertBefore(btn, document.getElementById("sort-btn"));
   });
 
-  // Listen to orders
-  const today = new Date(); today.setHours(0,0,0,0);
+  // Listen to orders (shopIdだけでフィルター→複合インデックス不要)
   const q = query(
     collection(db,"orders"),
-    where("shopId","==",shopId),
-    where("createdAt",">=",Timestamp.fromDate(today))
+    where("shopId","==",shopId)
   );
+  let firstLoad = true;
   onSnapshot(q, snap=>{
     snap.docChanges().forEach(change=>{
-      if(change.type==="removed") delete allOrders[change.doc.id];
-      else allOrders[change.doc.id] = change.doc.data();
+      if(change.type==="removed"){
+        delete allOrders[change.doc.id];
+      } else {
+        allOrders[change.doc.id] = change.doc.data();
+        // 新規注文トースト（初回ロード除く）
+        if(!firstLoad && change.type==="added"){
+          const d = change.doc.data();
+          const hasAlcohol = (d.items||[]).some(i=>ALCOHOL_KW.some(k=>i.name.includes(k)));
+          const msg = "☕ "+tableName(d.table)+" から注文が入りました"+(hasAlcohol?" 🍺お酒はストローいらんぞ":"");
+          showToast(msg);
+        }
+      }
     });
+    firstLoad = false;
     renderOrders();
-    // Update sales
     const total = Object.values(allOrders).filter(o=>o.status==="done").reduce((s,o)=>s+(o.total||0),0);
     document.getElementById("sales-total").textContent = "¥"+total.toLocaleString();
   });
@@ -622,17 +631,6 @@ async function init(){
       });
     }
   );
-
-  // Alcohol notification on new orders
-  onSnapshot(q, snap=>{
-    snap.docChanges().forEach(change=>{
-      if(change.type!=="added") return;
-      const d = change.doc.data();
-      const hasAlcohol = (d.items||[]).some(i=>ALCOHOL_KW.some(k=>i.name.includes(k)));
-      const msg = "☕ "+tableName(d.table)+" から注文が入りました"+(hasAlcohol?" 🍺お酒はストローいらんぞ":"");
-      showToast(msg);
-    });
-  });
 
   // Tick elapsed times
   setInterval(renderOrders, 60000);
