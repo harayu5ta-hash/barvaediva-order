@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Café Order</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;600;700&family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --main:    #3d2000;
+  --accent:  #c47a2e;
+  --bg:      #fdf6ec;
+  --surface: #fffbf4;
+  --border:  #e8d5b0;
+  --muted:   #9a6a40;
+  --text:    #2c1600;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Noto Serif JP',serif;min-height:100vh;padding-bottom:120px}
+
+/* ── HEADER ── */
+#header{
+  background:var(--main);color:#fdf6ec;
+  padding:16px 20px 12px;
+  position:sticky;top:0;z-index:100;
+  display:flex;align-items:center;justify-content:space-between;
+  border-bottom:3px solid var(--accent);
+}
+#header-title{font-family:'Playfair Display',serif;font-size:22px;letter-spacing:.06em}
+#header-table{font-size:13px;opacity:.75;margin-top:2px;letter-spacing:.05em}
+#cart-badge{
+  background:var(--accent);color:#fff;
+  border-radius:50%;width:28px;height:28px;
+  font-size:14px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;
+  display:none;
+}
+
+/* ── SESSION BLOCK ── */
+#session-block{
+  display:none;
+  position:fixed;inset:0;z-index:200;
+  background:var(--bg);
+  flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;padding:40px;
+  font-family:'Noto Serif JP',serif;
+}
+#session-block h2{font-size:20px;color:var(--main);margin-bottom:12px;font-family:'Playfair Display',serif}
+#session-block p{font-size:14px;color:var(--muted);line-height:1.8}
+
+/* ── CATEGORY NAV ── */
+#cat-nav{
+  display:flex;gap:0;overflow-x:auto;
+  border-bottom:1px solid var(--border);
+  background:var(--surface);
+  position:sticky;top:67px;z-index:90;
+  scrollbar-width:none;padding:0 8px;
+}
+#cat-nav::-webkit-scrollbar{display:none}
+.cat-btn{
+  flex:none;padding:12px 18px;
+  font-size:13px;font-family:'Noto Serif JP',serif;
+  background:none;border:none;cursor:pointer;
+  color:var(--muted);border-bottom:2px solid transparent;
+  white-space:nowrap;transition:all .2s;letter-spacing:.04em;
+}
+.cat-btn.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:700}
+
+/* ── MENU SECTIONS ── */
+#menu-wrap{padding:0 16px}
+
+.menu-section{padding:28px 0 8px}
+.section-header{
+  display:flex;align-items:center;gap:10px;
+  margin-bottom:20px;
+}
+.section-header::before,.section-header::after{
+  content:'';flex:1;height:1px;background:var(--border);
+}
+.section-header span{
+  font-family:'Playfair Display',serif;
+  font-size:17px;letter-spacing:.1em;color:var(--accent);
+  white-space:nowrap;
+}
+
+.item-row{
+  display:flex;align-items:flex-start;gap:12px;
+  padding:14px 0;border-bottom:1px dotted var(--border);
+}
+.item-row:last-child{border-bottom:none}
+.item-info{flex:1}
+.item-name{font-size:15px;font-weight:600;letter-spacing:.03em;color:var(--main)}
+.item-desc{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.6;font-weight:400}
+.item-price{
+  font-family:'Playfair Display',serif;
+  font-size:16px;color:var(--accent);
+  white-space:nowrap;
+}
+.item-right{
+  display:flex;flex-direction:column;align-items:flex-end;gap:8px;
+  min-width:90px;
+}
+.qty-ctrl{display:flex;align-items:center;gap:6px}
+.qty-btn{
+  width:28px;height:28px;border-radius:50%;
+  border:1.5px solid var(--border);background:var(--surface);
+  font-size:16px;cursor:pointer;color:var(--main);
+  display:flex;align-items:center;justify-content:center;
+  transition:all .15s;
+}
+.qty-btn:active{background:var(--border)}
+.qty-num{font-size:15px;min-width:18px;text-align:center;font-weight:700;color:var(--main)}
+
+/* ── CART FOOTER ── */
+#cart-footer{
+  position:fixed;bottom:0;left:0;right:0;z-index:100;
+  padding:12px 16px;
+  background:var(--main);color:#fdf6ec;
+  display:none;
+  flex-direction:column;gap:0;
+  border-top:3px solid var(--accent);
+}
+#cart-summary{
+  display:flex;justify-content:space-between;align-items:center;
+  margin-bottom:10px;font-size:14px;
+}
+#cart-items-preview{
+  font-size:12px;opacity:.75;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  margin-bottom:8px;
+}
+#order-btn{
+  width:100%;padding:14px;
+  background:var(--accent);color:#fff;
+  border:none;font-size:15px;letter-spacing:.1em;
+  font-family:'Noto Serif JP',serif;font-weight:700;
+  border-radius:3px;cursor:pointer;
+  transition:opacity .2s;
+}
+#order-btn:hover{opacity:.9}
+#order-btn:disabled{opacity:.4;cursor:default}
+
+/* ── HISTORY TAB ── */
+#history-wrap{display:none;padding:20px 16px}
+#history-wrap h2{
+  font-family:'Playfair Display',serif;
+  font-size:20px;color:var(--accent);margin-bottom:20px;
+  border-bottom:1px solid var(--border);padding-bottom:12px;
+}
+.history-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:6px;padding:16px;margin-bottom:16px;
+}
+.history-card-header{
+  display:flex;justify-content:space-between;align-items:center;
+  margin-bottom:10px;
+}
+.history-time{font-size:12px;color:var(--muted)}
+.history-status{
+  font-size:12px;padding:3px 10px;border-radius:12px;
+  background:var(--border);color:var(--main);
+}
+.history-status.done{background:#d4edda;color:#2a6a3a}
+.history-status.new{background:#fff3cd;color:#7a5500}
+.history-item-list{font-size:14px;line-height:2;color:var(--main)}
+.history-progress{
+  margin-top:10px;
+  background:var(--border);height:4px;border-radius:2px;
+}
+.history-progress-fill{background:var(--accent);height:4px;border-radius:2px;transition:width .3s}
+.history-total{
+  margin-top:10px;text-align:right;
+  font-family:'Playfair Display',serif;
+  font-size:16px;color:var(--accent);
+}
+
+/* ── TOAST ── */
+#toast{
+  position:fixed;bottom:100px;left:50%;transform:translateX(-50%);
+  background:rgba(61,32,0,.92);color:#fdf6ec;
+  padding:10px 24px;border-radius:20px;font-size:14px;
+  opacity:0;transition:opacity .3s;pointer-events:none;z-index:300;
+  white-space:nowrap;
+}
+#toast.show{opacity:1}
+
+/* ── TAB BAR ── */
+#tab-bar{
+  position:fixed;bottom:0;left:0;right:0;z-index:150;
+  display:flex;background:var(--surface);
+  border-top:1px solid var(--border);
+}
+#tab-bar button{
+  flex:1;padding:14px 0;
+  background:none;border:none;
+  font-size:12px;font-family:'Noto Serif JP',serif;
+  color:var(--muted);cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+}
+#tab-bar button .tab-icon{font-size:20px}
+#tab-bar button.active{color:var(--accent)}
+</style>
+</head>
+<body>
+
+<div id="session-block">
+  <h2>しばらくお待ちください</h2>
+  <p id="session-msg">席の準備中です。<br>スタッフをお呼びください。</p>
+</div>
+
+<div id="header">
+  <div>
+    <div id="header-title">Café</div>
+    <div id="header-table">テーブル —</div>
+  </div>
+  <div id="cart-badge">0</div>
+</div>
+
+<div id="cat-nav"></div>
+
+<!-- MENU VIEW -->
+<div id="menu-wrap"></div>
+
+<!-- HISTORY VIEW -->
+<div id="history-wrap">
+  <h2>ご注文履歴</h2>
+  <div id="history-list"></div>
+</div>
+
+<div id="cart-footer">
+  <div id="cart-items-preview"></div>
+  <div id="cart-summary">
+    <span id="cart-count-label">—</span>
+    <span id="cart-total-label" style="font-family:'Playfair Display',serif;font-size:18px">¥0</span>
+  </div>
+  <button id="order-btn" onclick="submitOrder()">注文する</button>
+</div>
+
+<div id="tab-bar">
+  <button id="tab-menu" class="active" onclick="switchTab('menu')">
+    <span class="tab-icon">☕</span>
+    <span>メニュー</span>
+  </button>
+  <button id="tab-history" onclick="switchTab('history')">
+    <span class="tab-icon">🧾</span>
+    <span>注文履歴</span>
+  </button>
+</div>
+
+<div id="toast"></div>
+
+<script type="module">
+import { initializeApp }       from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, doc, getDoc, onSnapshot, addDoc, collection, serverTimestamp, Timestamp }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey:            "AIzaSyAFrmMUkpBXL-aBBxXjO8HBPOD2glM9jkk",
+  authDomain:        "qrclaud.firebaseapp.com",
+  projectId:         "qrclaud",
+  storageBucket:     "qrclaud.firebasestorage.app",
+  messagingSenderId: "1028256471338",
+  appId:             "1:1028256471338:web:539d7dc0e42f988a69e653"
+};
+
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
+
+// URL params
+const params  = new URLSearchParams(location.search);
+const shopId  = params.get("shop")  || "cafe-demo";
+const tableId = params.get("table") || "1";
+const sidParam= params.get("sid")   || "";
+
+let shopData    = null;
+let currentSid  = null;
+let sessionKey  = sidParam;
+let cart        = {};
+let menuData    = [];
+let sessionActive = false;
+
+// History from sessionStorage
+const SK = `orders_${shopId}_${tableId}`;
+function getHistory(){ try{ return JSON.parse(sessionStorage.getItem(SK)||"[]"); }catch(e){return[];} }
+function saveHistory(arr){ sessionStorage.setItem(SK, JSON.stringify(arr)); }
+
+function showToast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(()=>t.classList.remove("show"), 2500);
+}
+
+// Apply shop colors
+function applyTheme(shop){
+  const r = document.documentElement.style;
+  if(shop.mainColor)    r.setProperty("--main",    shop.mainColor);
+  if(shop.accentColor)  r.setProperty("--accent",  shop.accentColor);
+  if(shop.bgColor)      r.setProperty("--bg",      shop.bgColor);
+  if(shop.surfaceColor) r.setProperty("--surface", shop.surfaceColor);
+  if(shop.borderColor)  r.setProperty("--border",  shop.borderColor);
+}
+
+// Update header
+function setHeader(){
+  document.getElementById("header-title").textContent = shopData?.name || "Café";
+  const tl = tableId.startsWith("counter") ? "カウンター " + tableId.replace("counter","") : "テーブル " + tableId;
+  document.getElementById("header-table").textContent = tl;
+}
+
+// Build category nav
+function buildNav(){
+  const nav = document.getElementById("cat-nav");
+  nav.innerHTML = "";
+  menuData.forEach((cat,i)=>{
+    const btn = document.createElement("button");
+    btn.className = "cat-btn" + (i===0?" active":"");
+    btn.textContent = cat.category;
+    btn.dataset.cat = i;
+    btn.onclick = ()=>{
+      document.getElementById("sec-"+i)?.scrollIntoView({behavior:"smooth",block:"start"});
+    };
+    nav.appendChild(btn);
+  });
+}
+
+// Build menu
+function buildMenu(){
+  const wrap = document.getElementById("menu-wrap");
+  wrap.innerHTML = "";
+  menuData.forEach((cat,ci)=>{
+    const sec = document.createElement("div");
+    sec.className = "menu-section";
+    sec.id = "sec-"+ci;
+    sec.innerHTML = `<div class="section-header"><span>${cat.category}</span></div>`;
+    (cat.items||[]).forEach((item,ii)=>{
+      const idx = ci*1000+ii;
+      const row = document.createElement("div");
+      row.className = "item-row";
+      row.innerHTML = `
+        <div class="item-info">
+          <div class="item-name">${item.name}</div>
+          ${item.desc?`<div class="item-desc">${item.desc}</div>`:""}
+        </div>
+        <div class="item-right">
+          <div class="item-price">¥${item.price.toLocaleString()}</div>
+          <div class="qty-ctrl">
+            <button class="qty-btn" onclick="window.decItem(${idx})">−</button>
+            <span class="qty-num" id="qty-${idx}">0</span>
+            <button class="qty-btn" onclick="window.incItem(${idx},${ci},${ii})">＋</button>
+          </div>
+        </div>
+      `;
+      sec.appendChild(row);
+    });
+    wrap.appendChild(sec);
+  });
+
+  // Scroll observer for category nav highlight
+  const observer = new IntersectionObserver(entries=>{
+    entries.forEach(e=>{
+      if(e.isIntersecting){
+        const ci = e.target.id.replace("sec-","");
+        document.querySelectorAll(".cat-btn").forEach(b=>{
+          b.classList.toggle("active", b.dataset.cat===ci);
+        });
+      }
+    });
+  },{rootMargin:"-60px 0px -70% 0px"});
+  document.querySelectorAll(".menu-section").forEach(s=>observer.observe(s));
+}
+
+window.incItem = function(idx, ci, ii){
+  if(!sessionActive){ showToast("席がまだ利用できません"); return; }
+  const item = menuData[ci].items[ii];
+  cart[idx] = { name:item.name, price:item.price, qty:(cart[idx]?.qty||0)+1 };
+  document.getElementById("qty-"+idx).textContent = cart[idx].qty;
+  updateCartUI();
+};
+
+window.decItem = function(idx){
+  if(!cart[idx]||cart[idx].qty===0) return;
+  cart[idx].qty--;
+  if(cart[idx].qty===0) delete cart[idx];
+  document.getElementById("qty-"+idx).textContent = cart[idx]?.qty||0;
+  updateCartUI();
+};
+
+function updateCartUI(){
+  const keys  = Object.keys(cart);
+  const total = keys.reduce((s,k)=>s+cart[k].price*cart[k].qty,0);
+  const count = keys.reduce((s,k)=>s+cart[k].qty,0);
+  const footer = document.getElementById("cart-footer");
+  const badge  = document.getElementById("cart-badge");
+  if(count===0){
+    footer.style.display = "none";
+    badge.style.display  = "none";
+    return;
+  }
+  footer.style.display = "flex";
+  badge.style.display  = "flex";
+  badge.textContent    = count;
+  document.getElementById("cart-count-label").textContent = count + "点";
+  document.getElementById("cart-total-label").textContent = "¥" + total.toLocaleString();
+  const preview = keys.map(k=>cart[k].name+"×"+cart[k].qty).join("　");
+  document.getElementById("cart-items-preview").textContent = preview;
+}
+
+window.submitOrder = async function(){
+  const btn = document.getElementById("order-btn");
+  const keys = Object.keys(cart);
+  if(!keys.length) return;
+  btn.disabled = true;
+
+  const items = keys.map(k=>({ name:cart[k].name, price:cart[k].price, qty:cart[k].qty }));
+  const total = items.reduce((s,i)=>s+i.price*i.qty,0);
+  const now   = new Date();
+  const deleteAt = new Date(now.getTime() + 2*24*60*60*1000);
+
+  try{
+    const ref = await addDoc(collection(db,"orders"),{
+      shopId, table:tableId, session_id:currentSid||sessionKey||"",
+      items, total, status:"new",
+      createdAt:serverTimestamp(),
+      deleteAt:Timestamp.fromDate(deleteAt),
+      completedItems:[]
+    });
+    // Save to history
+    const hist = getHistory();
+    hist.unshift({ id:ref.id, items, total, status:"new", createdAt:now.toISOString(), completedItems:[] });
+    saveHistory(hist);
+    // Reset cart
+    Object.keys(cart).forEach(k=>{
+      const el = document.getElementById("qty-"+k);
+      if(el) el.textContent = "0";
+    });
+    cart = {};
+    updateCartUI();
+    showToast("☕ ご注文を承りました");
+  }catch(e){
+    console.error(e);
+    showToast("エラーが発生しました");
+  }
+  btn.disabled = false;
+};
+
+// History tab
+function renderHistory(){
+  const hist = getHistory();
+  const list = document.getElementById("history-list");
+  if(!hist.length){
+    list.innerHTML = '<p style="color:var(--muted);font-size:14px;text-align:center;padding:40px 0">まだご注文はありません</p>';
+    return;
+  }
+  list.innerHTML = "";
+  hist.forEach(o=>{
+    const totalServings = (o.items||[]).reduce((s,i)=>s+i.qty,0);
+    const completed = (o.completedItems||[]).length;
+    const ratio = totalServings>0 ? Math.round(completed/totalServings*100) : 0;
+    const statusLabel = o.status==="done"?"提供完了" : o.status==="working"?"準備中" : "受付済";
+    const statusClass = o.status==="done"?"done" : o.status==="working"?"" : "new";
+    const time = o.createdAt ? new Date(o.createdAt).toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}) : "";
+    const itemHtml = (o.items||[]).map(i=>`<span>${i.name}×${i.qty}</span>`).join("　");
+    const card = document.createElement("div");
+    card.className = "history-card";
+    card.innerHTML = `
+      <div class="history-card-header">
+        <span class="history-time">${time}</span>
+        <span class="history-status ${statusClass}">${statusLabel}</span>
+      </div>
+      <div class="history-item-list">${itemHtml}</div>
+      ${totalServings>0?`
+      <div class="history-progress">
+        <div class="history-progress-fill" style="width:${ratio}%"></div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px;text-align:right">${completed}/${totalServings} 品提供済</div>
+      `:""}
+      <div class="history-total">¥${(o.total||0).toLocaleString()}</div>
+    `;
+    list.appendChild(card);
+  });
+}
+
+// Tab switching
+window.switchTab = function(tab){
+  const isMenu = tab==="menu";
+  document.getElementById("menu-wrap").style.display   = isMenu?"block":"none";
+  document.getElementById("cat-nav").style.display     = isMenu?"flex":"none";
+  document.getElementById("history-wrap").style.display= isMenu?"none":"block";
+  document.getElementById("tab-menu").classList.toggle("active",isMenu);
+  document.getElementById("tab-history").classList.toggle("active",!isMenu);
+  if(!isMenu) renderHistory();
+};
+
+// Session check
+function checkSession(d){
+  if(!d.exists()){
+    showBlocked();
+    return;
+  }
+  const data = d.data();
+  if(!data.active){
+    showBlocked();
+    return;
+  }
+  if(sessionKey && data.session_id && data.session_id !== sessionKey){
+    showBlocked();
+    return;
+  }
+  currentSid    = data.session_id;
+  sessionActive = true;
+  document.getElementById("session-block").style.display = "none";
+}
+
+function showBlocked(){
+  sessionActive = false;
+  const tl = tableId.startsWith("counter") ? "カウンター " + tableId.replace("counter","") : "テーブル " + tableId;
+  const sb = document.getElementById("session-block");
+  sb.style.display = "flex";
+  document.getElementById("session-msg").innerHTML =
+    `<strong>${tl}</strong> はただいまご利用いただけません。<br>スタッフをお呼びください。`;
+}
+
+// Init
+async function init(){
+  // Load shop
+  try{
+    const snap = await getDoc(doc(db,"shops",shopId));
+    if(snap.exists()){
+      shopData = snap.data();
+      applyTheme(shopData);
+      menuData = shopData.menu||[];
+    }
+  }catch(e){ console.warn(e); }
+
+  setHeader();
+  buildNav();
+  buildMenu();
+
+  // Session listener
+  const sessionRef = doc(db,"sessions", shopId+"_"+tableId);
+  onSnapshot(sessionRef, d=>checkSession(d));
+}
+
+init();
+</script>
+</body>
+</html>
